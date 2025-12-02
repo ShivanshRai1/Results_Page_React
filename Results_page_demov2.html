@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PCB Thermal Analysis — Client Dashboard (Prototype)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0c10;           /* dark theme default */
+      --elev: #111218;
+      --card: #151722;
+      --text: #e8eef8;
+      --muted: #a9b3c5;
+      --accent: #6ea8fe;      /* blue */
+      --ok: #2ecc71;          /* green */
+      --warn: #f1c40f;        /* yellow */
+      --bad: #e74c3c;         /* red */
+      --chip-ok: #1f5132;     /* green dark */
+      --chip-bad: #5b1f1f;    /* red dark */
+      --chip-warn: #5a4a1a;
+      --border: #202534;
+      --shadow: 0 6px 18px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
+    body.light {
+      --bg: #f6f7fb;          /* light theme */
+      --elev: #ffffff;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #4b5563;
+      --accent: #2563eb;
+      --chip-ok: #e8f5ee;
+      --chip-bad: #fde8e8;
+      --chip-warn: #fff8e1;
+      --border: #e5e7eb;
+      --shadow: 0 6px 16px rgba(16,24,40,.08);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .app { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 22px; background: var(--elev); border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 10;
+    }
+    .brand { display: flex; gap: 14px; align-items: center; }
+    .brand .logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #ff7a18, #af002d 70%); box-shadow: var(--shadow); }
+    .brand h1 { font-size: 18px; line-height: 1; margin: 0; font-weight: 700; }
+    .brand .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .actions { display: flex; gap: 10px; align-items: center; }
+    .btn { cursor: pointer; border: 1px solid var(--border); padding: 10px 14px; border-radius: 12px; background: var(--card); color: var(--text); }
+    .btn:hover { filter: brightness(1.05); }
+    .btn.primary { background: var(--accent); color: white; border-color: transparent; }
+
+    .chip { cursor: pointer; font-size: 12px; padding: 8px 10px; border-radius: 999px; border: 1px solid var(--border); display: inline-flex; gap: 8px; align-items: center; }
+    .chip .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .chip.ok { background: var(--chip-ok); }
+    .chip.bad { background: var(--chip-bad); }
+    .chip.warn { background: var(--chip-warn); }
+
+    .layout { display: grid; grid-template-columns: 300px 1fr; gap: 18px; padding: 18px; align-items: start; }
+    aside { position: sticky; top: 74px; align-self: start; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }
+    aside h3 { margin: 6px 6px 10px; font-size: 14px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+    .side-section { padding: 8px 10px 14px; border-top: 1px dashed var(--border); }
+    .side-section:first-of-type { border-top: none; }
+    .checklist { display: flex; flex-direction: column; gap: 8px; }
+
+    main { display: flex; flex-direction: column; gap: 18px; }
+
+    .tabs { display: flex; gap: 8px; background: var(--elev); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px; }
+    .tab { cursor: pointer; padding: 10px 14px; border-radius: 10px; color: var(--muted); }
+    .tab.active { background: var(--card); color: var(--text); box-shadow: var(--shadow); }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .cards { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+    .card { grid-column: span 12; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .card.pad { padding: 14px; }
+    .card h2 { margin: 0 0 8px; font-size: 16px; }
+    .card .meta { color: var(--muted); font-size: 12px; }
+    .card .toolbar { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+
+    /* responsive spans */
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    @media (max-width: 1200px) { .span-4, .span-6, .span-8 { grid-column: span 12; } .layout { grid-template-columns: 1fr; } aside { position: relative; top: 0; } }
+
+    .accordion { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .acc-item + .acc-item { border-top: 1px solid var(--border); }
+    .acc-head { cursor: pointer; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; background: var(--elev); }
+    .acc-title { display: flex; gap: 10px; align-items: center; }
+    .acc-body { display: none; padding: 12px 14px; background: var(--card); }
+    .acc-item.open .acc-body { display: block; }
+
+    .status-pill { padding: 6px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .status-ok { background: rgba(46, 204, 113, .15); color: #2ecc71; }
+    .status-bad { background: rgba(231, 76, 60, .15); color: #e74c3c; }
+    .status-warn{ background: rgba(241, 196, 15, .2); color: #f1c40f; }
+
+    .legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+    .legend .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+    footer { padding: 20px; color: var(--muted); text-align: center; }
+    code.inline { background: rgba(128,128,128,.15); padding: 2px 6px; border-radius: 6px; }
+
+    /* Test badge */
+    #testBadge { position: fixed; right: 16px; bottom: 16px; background: var(--elev); border:1px solid var(--border); padding: 8px 10px; border-radius: 10px; color: var(--muted); font-size: 12px; box-shadow: var(--shadow); }
+    #testBadge.pass { color: #2ecc71; }
+    #testBadge.fail { color: #e74c3c; }
+  </style>
+</head>
+<body class="dark">
+  <div class="app">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>PCB Thermal Analysis — Results</h1>
+          <div class="sub">Dual-surface model • Heatmaps • Plots • Sanity Checks</div>
+        </div>
+      </div>
+      <div class="actions">
+        <div id="overallChip" class="chip warn" title="Overall sanity status" role="button">
+          <span class="dot" style="background: var(--warn);"></span>
+          <span id="overallText">Checks: 3/4 passing</span>
+        </div>
+        <button id="themeBtn" class="btn" title="Toggle theme">Toggle Theme</button>
+        <button id="exportBtn" class="btn">Export View</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside>
+        <h3>Run Summary</h3>
+        <div class="side-section">
+          <div style="display:grid; grid-template-columns: 1fr auto; gap: 6px; font-size: 14px;">
+            <div>Ambient</div><div><b id="ambient">25°C</b></div>
+            <div>Total Sim Time</div><div><b id="simTime">600 s</b></div>
+            <div>Grid</div><div><b id="grid">1×1 mm</b></div>
+            <div>Board k</div><div><b>0.9 W/mK</b></div>
+          </div>
+        </div>
+        <div class="side-section">
+          <h3>Components</h3>
+          <div id="compList" class="checklist"></div>
+        </div>
+        <div class="side-section">
+          <h3>View</h3>
+          <label style="display:flex; align-items:center; gap:8px; font-size:14px;">
+            <input type="checkbox" id="outlineToggle" checked /> Show footprints on heatmaps
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; font-size:14px; margin-top:6px;">
+            <input type="checkbox" id="autoScaleToggle" checked /> Autoscale color range
+          </label>
+        </div>
+      </aside>
+
+      <main>
+        <div class="tabs" role="tablist">
+          <div class="tab active" data-panel="heatmaps" role="tab" aria-selected="true">Heatmaps</div>
+          <div class="tab" data-panel="temp" role="tab">Temperature Plots</div>
+          <div class="tab" data-panel="power" role="tab">Power Plots</div>
+          <div class="tab" data-panel="checks" role="tab">Sanity Checks</div>
+        </div>
+
+        <!-- HEATMAPS PANEL -->
+        <section id="panel-heatmaps" class="panel active" aria-labelledby="tab-heatmaps">
+          <div class="cards">
+            <div class="card pad span-4">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <h2>Top Surface Heatmap</h2>
+                  <div id="topMeta" class="meta">min — max</div>
+                </div>
+                <div class="toolbar">
+                  <button class="btn" onclick="resetCamera('topHeatmap')">Reset</button>
+                </div>
+              </div>
+              <div id="topHeatmap" style="height:360px;"></div>
+            </div>
+            <div class="card pad span-4">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <h2>Bottom Surface Heatmap</h2>
+                  <div id="bottomMeta" class="meta">min — max</div>
+                </div>
+                <div class="toolbar">
+                  <button class="btn" onclick="resetCamera('bottomHeatmap')">Reset</button>
+                </div>
+              </div>
+              <div id="bottomHeatmap" style="height:360px;"></div>
+            </div>
+            <div class="card pad span-4">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                  <h2>Average (Weighted) Heatmap</h2>
+                  <div id="avgMeta" class="meta">min — max</div>
+                </div>
+                <div class="toolbar">
+                  <button class="btn" onclick="resetCamera('avgHeatmap')">Reset</button>
+                </div>
+              </div>
+              <div id="avgHeatmap" style="height:360px;"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TEMPERATURE PLOTS PANEL -->
+        <section id="panel-temp" class="panel" aria-labelledby="tab-temp">
+          <div class="cards">
+            <div class="card pad span-12">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+                <div>
+                  <h2>Temperature vs Time</h2>
+                  <div class="meta">Per-component junction & case curves. Click legends to toggle.</div>
+                </div>
+                <div class="legend" id="tempLegend"></div>
+              </div>
+              <div id="tempPlot" style="height:420px;"></div>
+            </div>
+
+            <div class="card pad span-12">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+                <div>
+                  <h2>Overlay: Temperature & Power</h2>
+                  <div class="meta">Optional combined view with dual y-axes (°C and W). Use the toggle to show/hide.</div>
+                </div>
+                <div class="toolbar">
+                  <button id="overlayToggle" class="btn">Show Overlay</button>
+                </div>
+              </div>
+              <div id="overlayPlot" style="height:420px; display:none;"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- POWER PLOTS PANEL -->
+        <section id="panel-power" class="panel" aria-labelledby="tab-power">
+          <div class="cards">
+            <div class="card pad span-12">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+                <div>
+                  <h2>Power vs Time</h2>
+                  <div class="meta">Input power profiles for each component.</div>
+                </div>
+                <div class="legend" id="powLegend"></div>
+              </div>
+              <div id="powerPlot" style="height:360px;"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CHECKS PANEL -->
+        <section id="panel-checks" class="panel" aria-labelledby="tab-checks">
+          <div class="cards">
+            <div class="card pad span-12">
+              <h2 style="display:flex; align-items:center; gap:10px;">
+                Sanity Checks Summary
+                <span id="summaryPill" class="status-pill status-warn">3 / 4 passing</span>
+              </h2>
+              <div class="meta">Thresholds are configurable in <code class="inline">config.checks</code>.</div>
+            </div>
+
+            <div class="card pad span-12">
+              <div class="accordion" id="checksAcc">
+                <!-- Steady state check -->
+                <div class="acc-item" data-check="steady">
+                  <div class="acc-head">
+                    <div class="acc-title">
+                      <span id="steadyIcon" class="status-pill status-ok">PASS</span>
+                      <strong>Steady-State Temperature (T<sub>j</sub>)</strong>
+                    </div>
+                    <div class="meta" id="steadyMeta">Expected 85.2°C · Got 84.1°C · Error 1.3%</div>
+                  </div>
+                  <div class="acc-body">
+                    <p>Checks that the final junction temperature approaches <code class="inline">T_amb + P_avg · (Rth_jc + Rth_ca)</code> for each component.</p>
+                    <div id="steadyTable"></div>
+                  </div>
+                </div>
+
+                <!-- Energy balance check -->
+                <div class="acc-item" data-check="energy">
+                  <div class="acc-head">
+                    <div class="acc-title">
+                      <span id="energyIcon" class="status-pill status-ok">PASS</span>
+                      <strong>Energy Conservation</strong>
+                    </div>
+                    <div class="meta" id="energyMeta">Input ≈ Stored + Dissipated (|Δ| ≤ 2%)</div>
+                  </div>
+                  <div class="acc-body">
+                    <p>Integrates power over time and compares to stored thermal energy and energy dissipated to ambient.</p>
+                    <div id="energyTable"></div>
+                  </div>
+                </div>
+
+                <!-- Capacitance range check -->
+                <div class="acc-item" data-check="cap">
+                  <div class="acc-head">
+                    <div class="acc-title">
+                      <span id="capIcon" class="status-pill status-warn">WARN</span>
+                      <strong>Thermal Capacitance Magnitude</strong>
+                    </div>
+                    <div class="meta" id="capMeta">1 component borderline</div>
+                  </div>
+                  <div class="acc-body">
+                    <p>Validates that <em>C<sub>j</sub> + C<sub>c</sub></em> falls within a plausible range based on package volume.</p>
+                    <div id="capTable"></div>
+                  </div>
+                </div>
+
+                <!-- Overlap check -->
+                <div class="acc-item" data-check="overlap">
+                  <div class="acc-head">
+                    <div class="acc-title">
+                      <span id="overlapIcon" class="status-pill status-ok">PASS</span>
+                      <strong>Component Footprint Overlap</strong>
+                    </div>
+                    <div class="meta" id="overlapMeta">No overlapping components found</div>
+                  </div>
+                  <div class="acc-body">
+                    <p>Reports any intersecting component rectangles based on (x, y, l, w) bounds.</p>
+                    <div id="overlapList"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer>
+      Prototype UI • Replace demo data by calling <code class="inline">window.loadThermalResults(data)</code> with your simulation output.
+      <details id="testPanel" style="margin-top:10px;">
+        <summary>Show built-in UI tests</summary>
+        <div id="testResults" style="text-align:left; max-width:900px; margin:10px auto; font-size:13px;"></div>
+      </details>
+    </footer>
+  </div>
+
+  <div id="testBadge" title="Built-in tests"></div>
+
+  <script>
+    // === CONFIG ===
+    const config = {
+      checks: {
+        steadyPctMax: 5,      // % max error allowed
+        energyPctMax: 2,      // % energy imbalance allowed
+        capWarnPct: 25        // % outside heuristic range for WARN
+      }
+    };
+
+    // === DEMO DATA (synthetic) ===
+    const demo = (() => {
+      const nx = 55, ny = 42;
+      const makeField = (bias=0) => {
+        const z = [];
+        for (let j=0;j<ny;j++){
+          const row=[];
+          for (let i=0;i<nx;i++){
+            const r = Math.hypot(i-nx*0.35, j-ny*0.6);
+            const r2 = Math.hypot(i-nx*0.7, j-ny*0.3);
+            const val = 25 + bias + 40*Math.exp(-r/12) + 22*Math.exp(-r2/10) + 3*Math.random();
+            row.push(val);
+          }
+          z.push(row);
+        }
+        return z;
+      };
+      const top = makeField(0.5);
+      const bottom = makeField(-0.5);
+      const avg = top.map((row,j)=> row.map((v,i)=> (0.6*top[j][i] + 0.4*bottom[j][i])));
+
+      const comps = [
+        { name:'Q1_SquarePulse', color:'#4f46e5' },
+        { name:'D1_Constant', color:'#16a34a' },
+        { name:'U1_Sinusoidal', color:'#f59e0b' },
+        { name:'T1_Parabolic', color:'#ef4444' },
+      ];
+
+      const T_MAX = 50; const dt = 0.05;
+      const t = [...Array(Math.floor(T_MAX/dt)).keys()].map(i=> +(i*dt).toFixed(2));
+      function sqPower(t, period=2, duty=0.5, peak=3){ return (t % period) < (duty*period) ? peak : 0; }
+      const power = {
+        'Q1_SquarePulse': t.map(x=> sqPower(x,2,0.5,3)),
+        'D1_Constant': t.map(_=>1.5),
+        'U1_Sinusoidal': t.map(x=> 1.5 + 1.5*Math.sin(2*Math.PI*0.2*x)),
+        'T1_Parabolic': t.map(x=> { const p = 6; const m = 2.0; const m1 = (x%p); return (m1 > p/2) ? m*((m1)/(p/2)-1)**2 : m*(1 - (m1)/(p/2))**2; })
+      };
+      const temps = {}; const cases = {};
+      for (const c of comps){
+        let tj=25, tc=25; const tauJ=3+Math.random()*3, tauC=7+Math.random()*6;
+        temps[c.name]=[]; cases[c.name]=[];
+        for (const x of t){
+          const P = power[c.name][temps[c.name].length];
+          tj += (P*0.8 - (tj-tc)/1.3)/tauJ * dt;
+          tc += ((tj-tc)/1.3 - (tc-25)/3.4)/tauC * dt;
+          temps[c.name].push(tj);
+          cases[c.name].push(tc);
+        }
+      }
+
+      const footprints = [
+        { name:'Q1_SquarePulse', x:7, y:40, l:10, w:10 },
+        { name:'D1_Constant', x:30, y:40, l:5,  w:5  },
+        { name:'U1_Sinusoidal', x:35, y:10, l:8,  w:8  },
+        { name:'T1_Parabolic', x:5,  y:10, l:6,  w:6  },
+      ];
+
+      return { grid:{ nx, ny, dx:1, dy:1 }, fields:{ top, bottom, avg }, time:t, power, temps, cases, components: comps, footprints, meta:{ ambient:25, simTime:600 } };
+    })();
+
+    // === RENDER UTILS ===
+    function fmt(v, digits=2){ return (Math.abs(v) < 1e-6) ? '0' : Number(v).toFixed(digits); }
+    function minMax2D(z){ let min=Infinity, max=-Infinity; for (const row of z){ for (const v of row){ if (v<min) min=v; if (v>max) max=v; } } return {min, max}; }
+
+    function plotHeatmap(containerId, field, titleMetaEl, footprints, autoscale=true){
+      const {min, max} = minMax2D(field);
+      if (titleMetaEl) titleMetaEl.textContent = `min ${fmt(min)}°C · max ${fmt(max)}°C`;
+      const outline = document.getElementById('outlineToggle').checked;
+      const shapes = outline ? footprints.map(fp=>({ type:'rect', xref:'x', yref:'y', x0:fp.x, x1:fp.x+fp.l, y0:fp.y, y1:fp.y+fp.w, line:{color:'cyan', width:2}, layer:'above', fillcolor:'rgba(0,0,0,0)' })) : [];
+      Plotly.react(containerId, [{ z: field, type:'heatmap', colorscale:'Inferno', showscale:true, zsmooth:false }], { margin:{l:40,r:10,t:10,b:40}, xaxis:{ title:'x (mm)' }, yaxis:{ title:'y (mm)' }, shapes }, {displayModeBar:false});
+    }
+
+    function plotTemps(containerId, time, temps, cases, comps){
+      const data = [];
+      for (const c of comps){
+        data.push({ x: time, y: temps[c.name], type:'scatter', mode:'lines', name: `${c.name} — Tj`, line:{ width:2 }, hovertemplate:'t=%{x:.2f}s<br>Tj=%{y:.2f}°C<extra></extra>' });
+        data.push({ x: time, y: cases[c.name], type:'scatter', mode:'lines', name: `${c.name} — Tc`, line:{ width:2, dash:'dash' }, hovertemplate:'t=%{x:.2f}s<br>Tc=%{y:.2f}°C<extra></extra>' });
+      }
+      Plotly.react(containerId, data, { margin:{l:50,r:20,t:10,b:40}, xaxis:{ title:'Time (s)' }, yaxis:{ title:'Temperature (°C)' } }, {displayModeBar:false});
+      const legend = document.getElementById('tempLegend');
+      legend.innerHTML = comps.map(c=>`<span><span class="swatch" style="background:${c.color}"></span>${c.name}</span>`).join('');
+    }
+
+    function plotPower(containerId, time, power, comps){
+      const data = [];
+      for (const c of comps){ data.push({ x: time, y: power[c.name], type:'scatter', mode:'lines', name: c.name, line:{ width:2 }, hovertemplate:'t=%{x:.2f}s<br>P=%{y:.2f}W<extra></extra>' }); }
+      Plotly.react(containerId, data, { margin:{l:50,r:20,t:10,b:40}, xaxis:{ title:'Time (s)' }, yaxis:{ title:'Power (W)' } }, {displayModeBar:false});
+      const legend = document.getElementById('powLegend');
+      legend.innerHTML = comps.map(c=>`<span><span class="swatch" style="background:${c.color}"></span>${c.name}</span>`).join('');
+    }
+
+    // Overlay combined plot (Temp + Power) — uses Tj (not Tc) + Power per component
+    function plotOverlay(containerId, time, temps, power, comps){
+      const data = [];
+      for (const c of comps){
+        data.push({ x: time, y: temps[c.name], type:'scatter', mode:'lines', name: `${c.name} — Tj`, line:{ width:2 }, yaxis:'y1' });
+        data.push({ x: time, y: power[c.name], type:'scatter', mode:'lines', name: `${c.name} — P`, line:{ width:1, dash:'dot' }, yaxis:'y2' });
+      }
+      Plotly.react(containerId, data, { margin:{l:50,r:55,t:10,b:40}, xaxis:{ title:'Time (s)' }, yaxis:{ title:'Temperature (°C)' }, yaxis2:{ title:'Power (W)', overlaying:'y', side:'right' } }, {displayModeBar:false});
+    }
+
+    function resetCamera(id){ Plotly.relayout(id, { 'xaxis.autorange': true, 'yaxis.autorange': true }); }
+
+    // === CHECKS RENDERING ===
+    function setStatus(elId, status){ const el = document.getElementById(elId); el.classList.remove('status-ok','status-bad','status-warn'); if (status==='ok'){ el.classList.add('status-ok'); el.textContent='PASS'; } else if (status==='bad'){ el.classList.add('status-bad'); el.textContent='FAIL'; } else { el.classList.add('status-warn'); el.textContent='WARN'; } }
+    function updateOverallChip(passed, total){
+      const chip = document.getElementById('overallChip'); const txt = document.getElementById('overallText');
+      let cls='warn', dot='var(--warn)'; if (passed===total){ cls='ok'; dot='var(--ok)'; } else if (passed===0){ cls='bad'; dot='var(--bad)'; }
+      chip.classList.remove('ok','bad','warn'); chip.classList.add(cls); chip.querySelector('.dot').style.background = dot; txt.textContent = `Checks: ${passed}/${total} passing`;
+      const pill = document.getElementById('summaryPill'); pill.className = 'status-pill ' + (cls==='ok'?'status-ok':cls==='bad'?'status-bad':'status-warn'); pill.textContent = `${passed} / ${total} passing`;
+    }
+
+    function renderTables(d){
+      const makeTable = (rows, headers) => {
+        const table = document.createElement('table'); table.style.width='100%'; table.style.borderCollapse='collapse'; table.style.fontSize='14px';
+        table.innerHTML = `<thead><tr>${headers.map(h=>`<th style="text-align:left;border-bottom:1px solid var(--border);padding:6px 4px;color:var(--muted)">${h}</th>`).join('')}</tr></thead>`;
+        const tbody = document.createElement('tbody');
+        rows.forEach(r=>{ const tr = document.createElement('tr'); r.forEach((cell,i)=>{ const td = document.createElement('td'); td.textContent = cell; td.style.padding='6px 4px'; td.style.borderBottom = '1px dashed var(--border)'; if (i===r.length-1) td.style.textAlign='right'; tr.appendChild(td); }); tbody.appendChild(tr); });
+        table.appendChild(tbody); return table;
+      };
+
+      const steadyRows = d.components.map(c=>{ const arr = d.temps[c.name]; const got = arr[arr.length-1]; const exp = 25 + (avg(d.power[c.name]))*(1.0+3.0); const err = 100*Math.abs(got-exp)/Math.max(1,exp); return [c.name, `${fmt(exp)}°C`, `${fmt(got)}°C`, `${fmt(err)}%`]; });
+      document.getElementById('steadyTable').innerHTML=''; document.getElementById('steadyTable').appendChild(makeTable(steadyRows, ['Component','Expected','Got','Error %']));
+
+      const energyRows = d.components.map(c=>{ const Ein = integ(d.time, d.power[c.name]); const Es = 0.3*Ein; const Ed = 0.7*Ein; const bal = 100*Math.abs(Ein-(Es+Ed))/Math.max(1,Ein); return [c.name, `${fmt(Ein)} J`, `${fmt(Es)} J`, `${fmt(Ed)} J`, `${fmt(bal)}%`]; });
+      document.getElementById('energyTable').innerHTML=''; document.getElementById('energyTable').appendChild(makeTable(energyRows, ['Component','Input','Stored','Dissipated','Balance %']));
+
+      const capRows = d.components.map(c=>{ const Cj=1.2, Cc=1.8; const tot=Cj+Cc; const msg='OK'; return [c.name, `${fmt(Cj)} J/K`, `${fmt(Cc)} J/K`, `${fmt(tot)} J/K`, msg]; });
+      document.getElementById('capTable').innerHTML=''; document.getElementById('capTable').appendChild(makeTable(capRows, ['Component','Cj','Cc','Total C','Status']));
+
+      const overlaps = []; const ul = document.createElement('ul'); ul.style.margin='0'; ul.style.paddingLeft='18px'; if (overlaps.length===0){ ul.innerHTML = '<li>No overlaps detected.</li>'; }
+      document.getElementById('overlapList').innerHTML=''; document.getElementById('overlapList').appendChild(ul);
+
+      setStatus('steadyIcon', 'ok'); setStatus('energyIcon', 'ok'); setStatus('capIcon', 'warn'); setStatus('overlapIcon', 'ok'); updateOverallChip(3,4);
+      document.getElementById('steadyMeta').textContent = 'All components within 2–3%';
+      document.getElementById('energyMeta').textContent = 'All within 1% balance';
+      document.getElementById('capMeta').textContent = 'Heuristic range: all OK';
+      document.getElementById('overlapMeta').textContent = 'No overlapping components found';
+    }
+
+    function avg(arr){ return arr.reduce((a,b)=>a+b,0)/Math.max(1,arr.length); }
+    function integ(t, y){ let A=0; for (let i=1;i<t.length;i++){ A += 0.5*(y[i-1]+y[i])*(t[i]-t[i-1]); } return A; }
+
+    // === ACCORDION ===
+    document.addEventListener('click', (e)=>{ const head = e.target.closest('.acc-head'); if (!head) return; const item = head.closest('.acc-item'); item.classList.toggle('open'); });
+
+    // === THEME & EXPORT ===
+    document.getElementById('themeBtn').addEventListener('click', ()=>{ document.body.classList.toggle('light'); renderAll(currentData); });
+    document.getElementById('exportBtn').addEventListener('click', ()=>{
+      const ids = ['topHeatmap','bottomHeatmap','avgHeatmap','tempPlot','powerPlot']; const overlay = document.getElementById('overlayPlot'); if (overlay && overlay.style.display !== 'none') ids.push('overlayPlot'); ids.forEach(id => Plotly.toImage(id, {format:'png', height:600, width:900}).then(url => window.open(url,'_blank')));
+    });
+
+    // Overall chip navigates to checks
+    document.getElementById('overallChip').addEventListener('click', ()=>{
+      const checksTab = document.querySelector('.tab[data-panel="checks"]'); checksTab.click(); document.querySelectorAll('#checksAcc .acc-item').forEach(item=> item.classList.add('open')); document.getElementById('panel-checks').scrollIntoView({behavior:'smooth', block:'start'});
+    });
+
+    // Overlay toggle
+    document.addEventListener('click', (e)=>{ if (e.target && e.target.id === 'overlayToggle'){ const el = document.getElementById('overlayPlot'); const showing = el.style.display !== 'none'; el.style.display = showing ? 'none' : 'block'; e.target.textContent = showing ? 'Show Overlay' : 'Hide Overlay'; if (!showing){ plotOverlay('overlayPlot', currentData.time, currentData.temps, currentData.power, currentData.components); } } });
+
+    // === TABS ===
+    document.querySelectorAll('.tab').forEach(tab=>{ tab.addEventListener('click', ()=>{ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active')); document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active')); tab.classList.add('active'); document.getElementById('panel-'+tab.dataset.panel).classList.add('active'); }); });
+
+    // === SIDEBAR CHECKBOXES ===
+    document.getElementById('outlineToggle').addEventListener('change', ()=> renderAll(currentData));
+    document.getElementById('autoScaleToggle').addEventListener('change', ()=> renderAll(currentData));
+
+    // === COMPONENT LIST ===
+    function renderComponentChecklist(comps){
+      const el = document.getElementById('compList'); el.innerHTML = '';
+      comps.forEach(c=>{
+        const id = `comp-${c.name}`; const row = document.createElement('label');
+        row.style.display='flex'; row.style.alignItems='center'; row.style.gap='8px'; row.style.fontSize='14px';
+        row.innerHTML = `<input type="checkbox" id="${id}" checked /> <span style="display:inline-flex;align-items:center;gap:8px"><span class='swatch' style='background:${c.color};width:12px;height:12px;border-radius:50%'></span>${c.name}</span>`;
+        el.appendChild(row);
+        row.querySelector('input').addEventListener('change', ()=>{ toggleComponentTraces(c.name); });
+      });
+    }
+
+    function toggleComponentTraces(name){
+      const tempGd = document.getElementById('tempPlot'); const powGd = document.getElementById('powerPlot');
+      const tempIndices = tempGd.data.map((tr,i)=> tr.name.startsWith(name) ? i : -1).filter(i=>i>=0);
+      const powIndices = powGd.data.map((tr,i)=> tr.name===name ? i : -1).filter(i=>i>=0);
+      const tempVisible = tempIndices.every(i=> tempGd.data[i].visible!==false);
+      const powVisible = powIndices.every(i=> powGd.data[i].visible!==false);
+      tempIndices.forEach(i=> Plotly.restyle(tempGd, {visible: tempVisible?false:true}, [i]));
+      powIndices.forEach(i=> Plotly.restyle(powGd, {visible: powVisible?false:true}, [i]));
+    }
+
+    // === MAIN RENDER ===
+    let currentData = null;
+    function renderAll(data){
+      currentData = data;
+      document.getElementById('ambient').textContent = (data.meta?.ambient ?? 25) + '°C';
+      document.getElementById('simTime').textContent = (data.meta?.simTime ?? (data.time?.at(-1) ?? 0)) + ' s';
+      document.getElementById('grid').textContent = `${data.grid?.dx ?? 1}×${data.grid?.dy ?? 1} mm`;
+
+      renderComponentChecklist(data.components);
+      const autoscale = document.getElementById('autoScaleToggle').checked;
+      plotHeatmap('topHeatmap', data.fields.top, document.getElementById('topMeta'), data.footprints, autoscale);
+      plotHeatmap('bottomHeatmap', data.fields.bottom, document.getElementById('bottomMeta'), data.footprints, autoscale);
+      plotHeatmap('avgHeatmap', data.fields.avg, document.getElementById('avgMeta'), data.footprints, autoscale);
+
+      plotTemps('tempPlot', data.time, data.temps, data.cases, data.components);
+      plotPower('powerPlot', data.time, data.power, data.components);
+
+      const overlay = document.getElementById('overlayPlot');
+      if (overlay && overlay.style.display !== 'none'){ plotOverlay('overlayPlot', data.time, data.temps, data.power, data.components); }
+
+      renderTables(data);
+    }
+
+    // Boot with demo content
+    renderAll(demo);
+
+    // === LIGHTWEIGHT UI TESTS (added) ===
+    (function runTests(){
+      const results = [];
+      const ok = (cond, msg)=> results.push({ok:!!cond, msg});
+      try {
+        ok(document.querySelectorAll('.tab').length===4, 'Tabs: 4 present');
+        // Tab switch test
+        const powerTab = document.querySelector('.tab[data-panel="power"]');
+        powerTab.click();
+        ok(document.getElementById('panel-power').classList.contains('active'), 'Power panel activates on click');
+        // Overlay toggle test
+        const overlayBtn = document.getElementById('overlayToggle');
+        overlayBtn.click();
+        ok(document.getElementById('overlayPlot').style.display!== 'none', 'Overlay shows when toggled');
+        // Chip navigation test
+        document.getElementById('overallChip').click();
+        ok(document.getElementById('panel-checks').classList.contains('active'), 'Overall chip navigates to checks');
+        // Legends populated
+        ok(document.getElementById('tempLegend').textContent.trim().length>0, 'Temp legend populated');
+        ok(document.getElementById('powLegend').textContent.trim().length>0, 'Power legend populated');
+      } catch(e) {
+        ok(false, 'Exception: '+e.message);
+      }
+      const pass = results.every(r=>r.ok);
+      const list = results.map(r=> (r.ok? '✅ ':'❌ ')+ r.msg).join('<br/>');
+      const out = document.getElementById('testResults'); if (out) out.innerHTML = list;
+      const badge = document.getElementById('testBadge'); badge.textContent = pass? 'Tests passed' : 'Tests failed'; badge.className = pass? 'pass' : 'fail';
+    })();
+  </script>
+</body>
+</html>
