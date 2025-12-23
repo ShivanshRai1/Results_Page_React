@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import Plotly from 'plotly.js-dist-min';
 import { ThemeProvider } from './components/ThemeContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { Heatmap } from './components/Heatmap';
 import { TemperaturePlots } from './components/TemperaturePlots';
 import { PowerPlots } from './components/PowerPlots';
+import { OverlayPlot } from './components/OverlayPlot';
 import { Checks } from './components/Checks';
 import { generateDemoData } from './utils/demoData';
 import { exportAllCsvs } from './utils/exportCsvs';
@@ -155,9 +155,7 @@ function AppContent() {
                     </div>
                   </div>
                   {showOverlay && (
-                    <div style={{ height: '420px' }}>
-                      <p style={{ color: 'var(--muted)', padding: '20px' }}>Overlay plot rendering...</p>
-                    </div>
+                    <OverlayPlot data={data} visibleComponents={visibleComponents} plotId="overlayPlot" />
                   )}
                 </div>
               </div>

@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import Plotly from 'plotly.js-dist-min';
+import { useTheme } from './ThemeContext';
 
 export const PowerPlots = ({ data, visibleComponents, plotId = 'powerPlot' }) => {
   const containerRef = useRef(null);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -19,10 +21,26 @@ export const PowerPlots = ({ data, visibleComponents, plotId = 'powerPlot' }) =>
         hovertemplate: 't=%{x:.2f}s<br>P=%{y:.2f}W<extra></extra>',
       }));
 
+    const textColor = isDark ? '#ffffff' : '#000000';
+
     const layout = {
       margin: { l: 50, r: 20, t: 10, b: 40 },
-      xaxis: { title: 'Time (s)' },
-      yaxis: { title: 'Power (W)' },
+      xaxis: { 
+        title: 'Time (s)',
+        titlefont: { color: textColor },
+        tickfont: { color: textColor },
+      },
+      yaxis: { 
+        title: 'Power (W)',
+        titlefont: { color: textColor },
+        tickfont: { color: textColor },
+      },
+      legend: {
+        font: { color: textColor },
+      },
+      hoverlabel: {
+        font: { color: '#000000' },
+      },
       plot_bgcolor: 'transparent',
       paper_bgcolor: 'transparent',
       hovermode: 'x unified',
@@ -35,7 +53,7 @@ export const PowerPlots = ({ data, visibleComponents, plotId = 'powerPlot' }) =>
         Plotly.purge(containerRef.current);
       }
     };
-  }, [data, visibleComponents]);
+  }, [data, visibleComponents, isDark]);
 
   return (
     <div className="card span-12">

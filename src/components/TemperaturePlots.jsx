@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import Plotly from 'plotly.js-dist-min';
+import { useTheme } from './ThemeContext';
 
 export const TemperaturePlots = ({ data, visibleComponents, plotId = 'tempPlot' }) => {
   const containerRef = useRef(null);
+  const { isDark } = useTheme();
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -30,10 +32,26 @@ export const TemperaturePlots = ({ data, visibleComponents, plotId = 'tempPlot' 
         },
       ]);
 
+    const textColor = isDark ? '#ffffff' : '#000000';
+
     const layout = {
       margin: { l: 50, r: 20, t: 10, b: 40 },
-      xaxis: { title: 'Time (s)' },
-      yaxis: { title: 'Temperature (°C)' },
+      xaxis: { 
+        title: 'Time (s)',
+        titlefont: { color: textColor },
+        tickfont: { color: textColor },
+      },
+      yaxis: { 
+        title: 'Temperature (°C)',
+        titlefont: { color: textColor },
+        tickfont: { color: textColor },
+      },
+      legend: {
+        font: { color: textColor },
+      },
+      hoverlabel: {
+        font: { color: '#000000' },
+      },
       plot_bgcolor: 'transparent',
       paper_bgcolor: 'transparent',
       hovermode: 'x unified',
@@ -46,7 +64,7 @@ export const TemperaturePlots = ({ data, visibleComponents, plotId = 'tempPlot' 
         Plotly.purge(containerRef.current);
       }
     };
-  }, [data, visibleComponents]);
+  }, [data, visibleComponents, isDark]);
 
   return (
     <div className="card span-12">
