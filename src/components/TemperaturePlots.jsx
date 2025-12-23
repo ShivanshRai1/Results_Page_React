@@ -6,6 +6,9 @@ export const TemperaturePlots = ({ data, visibleComponents, plotId = 'tempPlot' 
   const containerRef = useRef(null);
   const { isDark } = useTheme();
 
+  const baseHeight = 420;
+  const plotHeight = baseHeight + 140;
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -35,17 +38,32 @@ export const TemperaturePlots = ({ data, visibleComponents, plotId = 'tempPlot' 
     const textColor = isDark ? '#ffffff' : '#000000';
 
     const layout = {
-      margin: { l: 50, r: 20, t: 10, b: 40 },
-      xaxis: { 
+      margin: { l: 50, r: 20, t: 10, b: 120 },
+      xaxis: {
         title: 'Time (s)',
-        titlefont: { color: textColor },
-        tickfont: { color: textColor },
+        titlefont: { color: textColor, size: 12 },
+        tickfont: { color: textColor, size: 10 },
+        rangeslider: { visible: true, thickness: 0.05 },
+        range: [0, 45],
       },
-      yaxis: { 
+      yaxis: {
         title: 'Temperature (°C)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
       },
+      annotations: [
+        {
+          text: 'Drag range slider to explore full 600s',
+          xref: 'paper',
+          yref: 'paper',
+          x: 0.5,
+          y: -0.29,
+          xanchor: 'center',
+          yanchor: 'top',
+          showarrow: false,
+          font: { size: 10, color: isDark ? '#888888' : '#999999' },
+        },
+      ],
       legend: {
         font: { color: textColor },
       },
@@ -57,14 +75,14 @@ export const TemperaturePlots = ({ data, visibleComponents, plotId = 'tempPlot' 
       hovermode: 'x unified',
     };
 
+    layout.height = plotHeight;
+
     Plotly.newPlot(containerRef.current, plotData, layout, { displayModeBar: false, responsive: true });
 
     return () => {
-      if (containerRef.current) {
-        Plotly.purge(containerRef.current);
-      }
+      if (containerRef.current) Plotly.purge(containerRef.current);
     };
-  }, [data, visibleComponents, isDark]);
+  }, [data, visibleComponents, isDark, plotHeight]);
 
   return (
     <div className="card span-12">
@@ -82,7 +100,7 @@ export const TemperaturePlots = ({ data, visibleComponents, plotId = 'tempPlot' 
           ))}
         </div>
       </div>
-      <div ref={containerRef} id={plotId} style={{ width: '100%', height: '420px' }} />
+      <div ref={containerRef} id={plotId} style={{ width: '100%', height: `${baseHeight + 140}px` }} />
     </div>
   );
 };

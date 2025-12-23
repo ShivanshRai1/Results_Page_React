@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { average, integrate, findOverlaps, fmt } from '../utils/helpers';
+import { useTheme } from './ThemeContext';
 
 export const Checks = ({ data, config }) => {
+  const { isDark } = useTheme();
   const [expandedChecks, setExpandedChecks] = useState(new Set(['steady', 'energy', 'cap', 'overlap']));
 
   const toggleCheck = (checkKey) => {
@@ -113,7 +115,7 @@ export const Checks = ({ data, config }) => {
                   <span className={`status-pill status-${check.status}`}>
                     {check.status === 'ok' ? 'PASS' : check.status === 'bad' ? 'FAIL' : 'WARN'}
                   </span>
-                  <strong>{check.label}</strong>
+                  <strong style={{ color: isDark ? '#ffffff' : 'inherit' }}>{check.label}</strong>
                 </div>
                 <div className="meta acc-toggle">▼</div>
               </button>

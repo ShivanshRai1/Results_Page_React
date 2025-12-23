@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
+import { useTheme } from './ThemeContext';
 
 export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plotId }) => {
   const containerRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
+  const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
 
   useEffect(() => {
@@ -43,10 +45,20 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
       },
     ];
 
+    const textColor = isDark ? '#ffffff' : '#000000';
+
     const layout = {
       margin: { l: 40, r: 60, t: 10, b: 40 },
-      xaxis: { title: 'x (mm)' },
-      yaxis: { title: 'y (mm)' },
+      xaxis: { 
+        title: 'x (mm)',
+        titlefont: { color: textColor },
+        tickfont: { color: textColor },
+      },
+      yaxis: { 
+        title: 'y (mm)',
+        titlefont: { color: textColor },
+        tickfont: { color: textColor },
+      },
       shapes,
       plot_bgcolor: 'transparent',
       paper_bgcolor: 'transparent',
@@ -76,7 +88,7 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
         Plotly.purge(containerRef.current);
       }
     };
-  }, [field, footprints, showOutlines, autoScale]);
+  }, [field, footprints, showOutlines, autoScale, isDark]);
 
   return (
     <div className="card span-4">

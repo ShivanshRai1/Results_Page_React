@@ -37,12 +37,16 @@ export const OverlayPlot = ({ data, visibleComponents, plotId = 'overlayPlot', h
 
     const textColor = isDark ? '#ffffff' : '#000000';
 
+    const plotHeight = height + 140; // increase layout height so margins and rangeslider fit
+
     const layout = {
-      margin: { l: 60, r: 60, t: 60, b: 40 },
+      margin: { l: 60, r: 60, t: 60, b: 160 },
       xaxis: { 
         title: 'Time (s)',
-        titlefont: { color: textColor },
-        tickfont: { color: textColor },
+        titlefont: { color: textColor, size: 12 },
+        tickfont: { color: textColor, size: 10 },
+        rangeslider: { visible: true, thickness: 0.05 },
+        range: [0, 45],
       },
       yaxis: { 
         title: 'Temperature (°C)',
@@ -57,6 +61,19 @@ export const OverlayPlot = ({ data, visibleComponents, plotId = 'overlayPlot', h
         titlefont: { color: textColor },
         tickfont: { color: textColor },
       },
+      annotations: [
+        {
+          text: 'Drag range slider to explore full 600s',
+          xref: 'paper',
+          yref: 'paper',
+          x: 0.5,
+          y: -0.42,
+          xanchor: 'center',
+          yanchor: 'top',
+          showarrow: false,
+          font: { size: 10, color: isDark ? '#888888' : '#999999' },
+        },
+      ],
       legend: { 
         orientation: 'h', 
         y: 1.15, 
@@ -70,7 +87,7 @@ export const OverlayPlot = ({ data, visibleComponents, plotId = 'overlayPlot', h
       plot_bgcolor: 'transparent',
       paper_bgcolor: 'transparent',
       hovermode: 'x unified',
-      height,
+      height: plotHeight,
     };
 
     Plotly.newPlot(containerRef.current, [...tempTraces, ...powerTraces], layout, {
@@ -85,5 +102,5 @@ export const OverlayPlot = ({ data, visibleComponents, plotId = 'overlayPlot', h
     };
   }, [data, visibleComponents, height, isDark]);
 
-  return <div ref={containerRef} id={plotId} style={{ width: '100%', height: `${height}px` }} />;
+  return <div ref={containerRef} id={plotId} style={{ width: '100%', height: `${height + 140}px` }} />;
 };

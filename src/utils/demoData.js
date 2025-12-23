@@ -38,11 +38,10 @@ export const generateDemoData = () => {
     { name: 'T1_Parabolic', color: '#ef4444' },
   ];
 
-  const T_MAX = 50;
-  const dt = 0.05;
-  const t = [...Array(Math.floor(T_MAX / dt)).keys()].map((i) =>
-    +(i * dt).toFixed(2)
-  );
+  // Simulate for full 600 seconds; dt tuned to keep curve smooth without overloading Plotly
+  const T_MAX = 600;
+  const dt = 0.25;
+  const t = [...Array(Math.floor(T_MAX / dt)).keys()].map((i) => +(i * dt).toFixed(2));
 
   // Power waveform generators
   const sqPower = (t, period = 2, duty = 0.5, peak = 3) =>
