@@ -9,6 +9,16 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
 
+  const handleReset = () => {
+    if (containerRef.current) {
+      Plotly.relayout(containerRef.current, {
+        'xaxis.range': [0, 40],
+        'yaxis.range': [0, 40],
+      });
+      setIsZoomed(false);
+    }
+  };
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -53,11 +63,19 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
         title: 'x (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
+        range: [0, 40],
+        dtick: 10,
+        constrainaxis: 'range',
       },
       yaxis: { 
         title: 'y (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
+        range: [0, 40],
+        dtick: 10,
+        scaleanchor: 'x',
+        scaleratio: 1,
+        constrainaxis: 'range',
       },
       shapes,
       plot_bgcolor: 'transparent',
@@ -65,15 +83,40 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
       // colorbar is set on the trace (zmin/zmax) so the numeric labels match the data
     };
 
-    Plotly.newPlot(containerRef.current, data, layout, { displayModeBar: false, responsive: true });
+    Plotly.newPlot(containerRef.current, data, layout, { 
+      displayModeBar: false, 
+      responsive: true,
+      doubleClick: false  // Disable double-click zoom out
+    });
 
-    // Detect zoom events to show/hide tooltip
+
+    // Detect zoom events to show/hide tooltip and enforce axis limits
     const handleRelayout = (eventData) => {
+      let reset = false;
+      let update = {};
+      // Check x axis
+      if (
+        eventData['xaxis.range[0]'] !== undefined &&
+        (eventData['xaxis.range[0]'] < 0 || eventData['xaxis.range[1]'] > 40)
+      ) {
+        update['xaxis.range'] = [0, 40];
+        reset = true;
+      }
+      // Check y axis
+      if (
+        eventData['yaxis.range[0]'] !== undefined &&
+        (eventData['yaxis.range[0]'] < 0 || eventData['yaxis.range[1]'] > 40)
+      ) {
+        update['yaxis.range'] = [0, 40];
+        reset = true;
+      }
+      if (reset && containerRef.current) {
+        Plotly.relayout(containerRef.current, update);
+      }
+      // Tooltip logic (unchanged)
       if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
-        // User double-clicked to reset zoom
         setIsZoomed(false);
       } else if (eventData['xaxis.range[0]'] !== undefined || eventData['yaxis.range[0]'] !== undefined) {
-        // User zoomed in
         setIsZoomed(true);
       }
     };
@@ -99,6 +142,29 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
             min {fmt(min)}°C · max {fmt(max)}°C
           </div>
         </div>
+        <button 
+          onClick={handleReset}
+          style={{
+            padding: '6px 12px',
+            fontSize: '14px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            background: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.2)' : '1px solid rgba(0, 0, 0, 0.2)',
+            borderRadius: '4px',
+            color: isDark ? '#fff' : '#000',
+            transition: 'all 0.2s',
+            boxShadow: isDark ? 'none' : '0 1px 3px rgba(0, 0, 0, 0.1)',
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.background = isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.background = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+          }}
+        >
+          Reset
+        </button>
       </div>
       <div 
         ref={containerRef} 
@@ -124,7 +190,7 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
             }}
           >
-            Double-click to reset view
+            Click Reset to return to original view
           </div>
         )}
       </div>

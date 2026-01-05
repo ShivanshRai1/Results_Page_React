@@ -20,7 +20,7 @@ const config = {
 
 function AppContent() {
   const [data] = useState(() => generateDemoData());
-  const [activeTab, setActiveTab] = useState('heatmaps');
+  const [activeTab, setActiveTab] = useState('checks');
   const [showOutlines, setShowOutlines] = useState(true);
   const [autoScale, setAutoScale] = useState(true);
   const [visibleComponents, setVisibleComponents] = useState(
@@ -100,6 +100,20 @@ function AppContent() {
             >
               Sanity Checks
             </button>
+          </div>
+
+          {/* Tab Descriptions */}
+          <div style={{ 
+            padding: '12px 0', 
+            fontSize: '14px', 
+            color: 'var(--muted)',
+            borderBottom: '1px solid var(--border)',
+            marginBottom: '20px'
+          }}>
+            {activeTab === 'heatmaps' && 'Spatial temperature distribution across PCB surfaces showing hotspots and thermal gradients'}
+            {activeTab === 'temp' && 'Component temperature profiles over time with steady-state analysis'}
+            {activeTab === 'power' && 'Power dissipation and energy consumption metrics for each component'}
+            {activeTab === 'checks' && 'Validation checks for thermal steady-state, energy conservation, and component ratings'}
           </div>
 
           {/* Heatmaps Panel */}
