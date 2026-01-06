@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './components/ThemeContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -20,13 +21,26 @@ const config = {
 
 function AppContent() {
   const [data] = useState(() => generateDemoData());
-  const [activeTab, setActiveTab] = useState('checks');
   const [showOutlines, setShowOutlines] = useState(true);
   const [autoScale, setAutoScale] = useState(true);
   const [visibleComponents, setVisibleComponents] = useState(
     new Set(data.components.map((c) => c.name))
   );
   const [showOverlay, setShowOverlay] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Determine active tab from URL path
+  const getActiveTabFromPath = () => {
+    const path = location.pathname;
+    if (path.includes('power')) return 'power';
+    if (path.includes('temp')) return 'temp';
+    if (path.includes('heatmaps')) return 'heatmaps';
+    if (path.includes('checks')) return 'checks';
+    return 'checks'; // default
+  };
+
+  const activeTab = getActiveTabFromPath();
 
   const toggleComponent = (name) => {
     const newSet = new Set(visibleComponents);
@@ -56,50 +70,50 @@ function AppContent() {
 
         <main>
           <div className="tabs" role="tablist">
-            <button
-              className={`tab ${activeTab === 'heatmaps' ? 'active' : ''}`}
-              onClick={() => {
-                console.log('Clicked Heatmaps');
-                setActiveTab('heatmaps');
-              }}
-              role="tab"
-              aria-selected={activeTab === 'heatmaps'}
-            >
-              Heatmaps
-            </button>
-            <button
-              className={`tab ${activeTab === 'temp' ? 'active' : ''}`}
-              onClick={() => {
-                console.log('Clicked Temperature Plots');
-                setActiveTab('temp');
-              }}
-              role="tab"
-              aria-selected={activeTab === 'temp'}
-            >
-              Temperature Plots
-            </button>
-            <button
+            <Link
+              to="/power"
               className={`tab ${activeTab === 'power' ? 'active' : ''}`}
-              onClick={() => {
-                console.log('Clicked Power Plots');
-                setActiveTab('power');
-              }}
               role="tab"
               aria-selected={activeTab === 'power'}
-            >
-              Power Plots
-            </button>
-            <button
-              className={`tab ${activeTab === 'checks' ? 'active' : ''}`}
-              onClick={() => {
-                console.log('Clicked Sanity Checks');
-                setActiveTab('checks');
+              onClick={(e) => {
+                navigate('/power');
               }}
+            >
+              Power vs time
+            </Link>
+            <Link
+              to="/temp"
+              className={`tab ${activeTab === 'temp' ? 'active' : ''}`}
+              role="tab"
+              aria-selected={activeTab === 'temp'}
+              onClick={(e) => {
+                navigate('/temp');
+              }}
+            >
+              Junction/Case temperature vs time
+            </Link>
+            <Link
+              to="/heatmaps"
+              className={`tab ${activeTab === 'heatmaps' ? 'active' : ''}`}
+              role="tab"
+              aria-selected={activeTab === 'heatmaps'}
+              onClick={(e) => {
+                navigate('/heatmaps');
+              }}
+            >
+              PCB heatmaps
+            </Link>
+            <Link
+              to="/checks"
+              className={`tab ${activeTab === 'checks' ? 'active' : ''}`}
               role="tab"
               aria-selected={activeTab === 'checks'}
+              onClick={(e) => {
+                navigate('/checks');
+              }}
             >
-              Sanity Checks
-            </button>
+              Sanity checks
+            </Link>
           </div>
 
           {/* Tab Descriptions */}
@@ -110,89 +124,92 @@ function AppContent() {
             borderBottom: '1px solid var(--border)',
             marginBottom: '20px'
           }}>
+            {activeTab === 'power' && 'Power dissipation and energy consumption metrics for each component over time'}
+            {activeTab === 'temp' && 'Junction/case temperature profiles for all components over time'}
             {activeTab === 'heatmaps' && 'Spatial temperature distribution across PCB surfaces showing hotspots and thermal gradients'}
-            {activeTab === 'temp' && 'Component temperature profiles over time with steady-state analysis'}
-            {activeTab === 'power' && 'Power dissipation and energy consumption metrics for each component'}
             {activeTab === 'checks' && 'Validation checks for thermal steady-state, energy conservation, and component ratings'}
           </div>
 
           {/* Heatmaps Panel */}
-          {activeTab === 'heatmaps' && (
-            <section className="panel active">
-              <div className="cards">
-                <Heatmap
-                  title="Top Surface Heatmap"
-                  field={data.fields.top}
-                  footprints={data.footprints}
-                  showOutlines={showOutlines}
-                  autoScale={autoScale}
-                  plotId="heatmapTop"
-                />
-                <Heatmap
-                  title="Bottom Surface Heatmap"
-                  field={data.fields.bottom}
-                  footprints={data.footprints}
-                  showOutlines={showOutlines}
-                  autoScale={autoScale}
-                  plotId="heatmapBottom"
-                />
-                <Heatmap
-                  title="Average (Weighted) Heatmap"
-                  field={data.fields.avg}
-                  footprints={data.footprints}
-                  showOutlines={showOutlines}
-                  autoScale={autoScale}
-                  plotId="heatmapAvg"
-                />
-              </div>
-            </section>
-          )}
-
-          {/* Temperature Plots Panel */}
-          {activeTab === 'temp' && (
-            <section className="panel active">
-              <div className="cards">
-                <TemperaturePlots data={data} visibleComponents={visibleComponents} plotId="tempPlot" />
-                <div className="card span-12">
-                  <div className="card-header">
-                    <div>
-                      <h2>Overlay: Temperature & Power</h2>
-                      <div className="meta">Optional combined view with dual y-axes (°C and W). Use the toggle to show/hide.</div>
-                    </div>
-                    <div className="toolbar">
-                      <button
-                        className="btn"
-                        onClick={() => setShowOverlay(!showOverlay)}
-                      >
-                        {showOverlay ? 'Hide Overlay' : 'Show Overlay'}
-                      </button>
-                    </div>
-                  </div>
-                  {showOverlay && (
-                    <OverlayPlot data={data} visibleComponents={visibleComponents} plotId="overlayPlot" />
-                  )}
+          <Routes>
+            <Route path="/power" element={
+              <section className="panel active">
+                <div className="cards">
+                  <PowerPlots data={data} visibleComponents={visibleComponents} plotId="powerPlot" />
                 </div>
-              </div>
-            </section>
-          )}
-
-          {/* Power Plots Panel */}
-          {activeTab === 'power' && (
-            <section className="panel active">
-              <div className="cards">
-                <PowerPlots data={data} visibleComponents={visibleComponents} plotId="powerPlot" />
-              </div>
-            </section>
-          )}
-
-          {/* Checks Panel */}
-          {activeTab === 'checks' && (
-            <section className="panel active">
-              <div className="cards">
-                <Checks data={data} config={config.checks} />
-              </div>
-            </section>
-          )}
+              </section>
+            } />
+            <Route path="/temp" element={
+              <section className="panel active">
+                <div className="cards">
+                  <TemperaturePlots data={data} visibleComponents={visibleComponents} plotId="tempPlot" />
+                  <div className="card span-12">
+                    <div className="card-header">
+                      <div>
+                        <h2>Overlay: Temperature & Power</h2>
+                        <div className="meta">Optional combined view with dual y-axes (°C and W). Use the toggle to show/hide.</div>
+                      </div>
+                      <div className="toolbar">
+                        <button
+                          className="btn"
+                          onClick={() => setShowOverlay(!showOverlay)}
+                        >
+                          {showOverlay ? 'Hide Overlay' : 'Show Overlay'}
+                        </button>
+                      </div>
+                    </div>
+                    {showOverlay && (
+                      <OverlayPlot data={data} visibleComponents={visibleComponents} plotId="overlayPlot" />
+                    )}
+                  </div>
+                </div>
+              </section>
+            } />
+            <Route path="/heatmaps" element={
+              <section className="panel active">
+                <div className="cards">
+                  <Heatmap
+                    title="Top Surface Heatmap"
+                    field={data.fields.top}
+                    footprints={data.footprints}
+                    showOutlines={showOutlines}
+                    autoScale={autoScale}
+                    plotId="heatmapTop"
+                  />
+                  <Heatmap
+                    title="Bottom Surface Heatmap"
+                    field={data.fields.bottom}
+                    footprints={data.footprints}
+                    showOutlines={showOutlines}
+                    autoScale={autoScale}
+                    plotId="heatmapBottom"
+                  />
+                  <Heatmap
+                    title="Average (Weighted) Heatmap"
+                    field={data.fields.avg}
+                    footprints={data.footprints}
+                    showOutlines={showOutlines}
+                    autoScale={autoScale}
+                    plotId="heatmapAvg"
+                  />
+                </div>
+              </section>
+            } />
+            <Route path="/checks" element={
+              <section className="panel active">
+                <div className="cards">
+                  <Checks data={data} config={config.checks} />
+                </div>
+              </section>
+            } />
+            <Route path="*" element={
+              <section className="panel active">
+                <div className="cards">
+                  <Checks data={data} config={config.checks} />
+                </div>
+              </section>
+            } />
+          </Routes>
         </main>
       </div>
 
@@ -204,7 +221,9 @@ function AppContent() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <Router>
+        <AppContent />
+      </Router>
     </ThemeProvider>
   );
 }
