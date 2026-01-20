@@ -2,12 +2,12 @@ import { useEffect, useRef } from 'react';
 import Plotly from 'plotly.js-dist-min';
 import { useTheme } from './ThemeContext';
 
-export const PowerPlots = ({ data, visibleComponents, plotId = 'powerPlot' }) => {
+export const PowerVsTime = ({ data, visibleComponents, plotId = 'powerPlot' }) => {
   const containerRef = useRef(null);
   const { isDark } = useTheme();
 
   const baseHeight = 360;
-  const plotHeight = baseHeight + 140; // extra room for rangeslider + annotation
+  const plotHeight = baseHeight + 140; // extra room for rangeslider
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -76,7 +76,7 @@ export const PowerPlots = ({ data, visibleComponents, plotId = 'powerPlot' }) =>
     <div className="card span-12">
       <div className="card-header">
         <div>
-          <h2>Power vs Time</h2>
+          <h2>Power vs time</h2>
           <div className="meta">Input power profiles for each component.</div>
         </div>
         <div className="legend">

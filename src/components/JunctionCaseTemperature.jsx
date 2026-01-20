@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import Plotly from 'plotly.js-dist-min';
 import { useTheme } from './ThemeContext';
 
-export const TemperaturePlots = ({ data, visibleComponents, plotId = 'tempPlot' }) => {
+export const JunctionCaseTemperature = ({ data, visibleComponents, plotId = 'tempPlot' }) => {
   const containerRef = useRef(null);
   const { isDark } = useTheme();
 
@@ -88,7 +88,7 @@ export const TemperaturePlots = ({ data, visibleComponents, plotId = 'tempPlot' 
     <div className="card span-12">
       <div className="card-header">
         <div>
-          <h2>Temperature vs Time</h2>
+          <h2>Junction/Case temperature vs time</h2>
           <div className="meta">Per-component junction & case curves. Click legends to toggle.</div>
         </div>
         <div className="legend">

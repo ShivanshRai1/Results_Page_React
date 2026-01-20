@@ -3,7 +3,7 @@ import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
 import { useTheme } from './ThemeContext';
 
-export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plotId }) => {
+export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale, plotId }) => {
   const containerRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
@@ -37,10 +37,8 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
         }))
       : [];
 
-    // When autoScale is true: use per-heatmap computed min/max (linear mapping, normal color grading).
-    // When autoScale is false: use exaggerated color range to highlight hotspots (smaller effective range).
-    const colorMin = autoScale ? min : (min + max) * 0.25;  // Exaggerated: shift min upward
-    const colorMax = autoScale ? max : (min + max) * 0.85;  // Exaggerated: shift max downward
+    const colorMin = autoScale ? min : (min + max) * 0.25;
+    const colorMax = autoScale ? max : (min + max) * 0.85;
 
     const data = [
       {
@@ -59,7 +57,7 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
 
     const layout = {
       margin: { l: 40, r: 60, t: 10, b: 40 },
-      xaxis: { 
+      xaxis: {
         title: 'x (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
@@ -67,7 +65,7 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
         dtick: 10,
         constrainaxis: 'range',
       },
-      yaxis: { 
+      yaxis: {
         title: 'y (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
@@ -80,21 +78,17 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
       shapes,
       plot_bgcolor: 'transparent',
       paper_bgcolor: 'transparent',
-      // colorbar is set on the trace (zmin/zmax) so the numeric labels match the data
     };
 
-    Plotly.newPlot(containerRef.current, data, layout, { 
-      displayModeBar: false, 
+    Plotly.newPlot(containerRef.current, data, layout, {
+      displayModeBar: false,
       responsive: true,
-      doubleClick: false  // Disable double-click zoom out
+      doubleClick: false,
     });
 
-
-    // Detect zoom events to show/hide tooltip and enforce axis limits
     const handleRelayout = (eventData) => {
       let reset = false;
       let update = {};
-      // Check x axis
       if (
         eventData['xaxis.range[0]'] !== undefined &&
         (eventData['xaxis.range[0]'] < 0 || eventData['xaxis.range[1]'] > 40)
@@ -102,7 +96,6 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
         update['xaxis.range'] = [0, 40];
         reset = true;
       }
-      // Check y axis
       if (
         eventData['yaxis.range[0]'] !== undefined &&
         (eventData['yaxis.range[0]'] < 0 || eventData['yaxis.range[1]'] > 40)
@@ -113,7 +106,6 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
       if (reset && containerRef.current) {
         Plotly.relayout(containerRef.current, update);
       }
-      // Tooltip logic (unchanged)
       if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
         setIsZoomed(false);
       } else if (eventData['xaxis.range[0]'] !== undefined || eventData['yaxis.range[0]'] !== undefined) {
@@ -142,7 +134,7 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
             min {fmt(min)}°C · max {fmt(max)}°C
           </div>
         </div>
-        <button 
+        <button
           onClick={handleReset}
           style={{
             padding: '6px 12px',
@@ -166,10 +158,10 @@ export const Heatmap = ({ title, field, footprints, showOutlines, autoScale, plo
           Reset
         </button>
       </div>
-      <div 
-        ref={containerRef} 
-        id={plotId} 
-        style={{ width: '100%', height: '360px', position: 'relative' }} 
+      <div
+        ref={containerRef}
+        id={plotId}
+        style={{ width: '100%', height: '360px', position: 'relative' }}
       >
         {isZoomed && (
           <div

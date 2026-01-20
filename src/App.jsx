@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './components/ThemeContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
-import { Heatmap } from './components/Heatmap';
-import { TemperaturePlots } from './components/TemperaturePlots';
-import { PowerPlots } from './components/PowerPlots';
+import { PCBHeatmaps } from './components/PCBHeatmaps';
+import { JunctionCaseTemperature } from './components/JunctionCaseTemperature';
+import { PowerVsTime } from './components/PowerVsTime';
 import { OverlayPlot } from './components/OverlayPlot';
 import { Checks } from './components/Checks';
 import { generateDemoData } from './utils/demoData';
 import { exportAllCsvs } from './utils/exportCsvs';
+import { runDefaultSimulation, transformBackendData } from './utils/api';
 
 const config = {
   checks: {
@@ -20,15 +21,57 @@ const config = {
 };
 
 function AppContent() {
-  const [data] = useState(() => generateDemoData());
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [useDemoData, setUseDemoData] = useState(false);
   const [showOutlines, setShowOutlines] = useState(true);
   const [autoScale, setAutoScale] = useState(true);
-  const [visibleComponents, setVisibleComponents] = useState(
-    new Set(data.components.map((c) => c.name))
-  );
+  const [visibleComponents, setVisibleComponents] = useState(new Set());
   const [showOverlay, setShowOverlay] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, [useDemoData]);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      let loadedData;
+      
+      if (useDemoData) {
+        console.log('[THERMAL] Using STATIC demo data');
+        loadedData = generateDemoData();
+      } else {
+        // Fetch from backend
+        const backendData = await runDefaultSimulation();
+        loadedData = transformBackendData(backendData);
+        console.log('[THERMAL] ✅ Successfully loaded DYNAMIC data from backend');
+      }
+      
+      setData(loadedData);
+      setVisibleComponents(new Set(loadedData.components.map((c) => c.name)));
+    } catch (err) {
+      console.error('[THERMAL] ❌ Dynamic data failed, falling back to STATIC demo data:', err.message);
+      setError(err.message);
+      // Fallback to demo data on error
+      const fallbackData = generateDemoData();
+      setData(fallbackData);
+      setVisibleComponents(new Set(fallbackData.components.map((c) => c.name)));
+      setUseDemoData(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRunSimulation = () => {
+    loadData();
+  };
 
   // Determine active tab from URL path
   const getActiveTabFromPath = () => {
@@ -53,12 +96,98 @@ function AppContent() {
   };
 
   const handleExport = () => {
-    exportAllCsvs(data);
+    if (data) {
+      exportAllCsvs(data);
+    }
   };
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="app">
+        <Header passedChecks={0} totalChecks={4} onExport={handleExport} />
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          height: '80vh',
+          flexDirection: 'column',
+          gap: '20px'
+        }}>
+          <div style={{ fontSize: '18px', color: 'var(--muted)' }}>
+            Running thermal simulation...
+          </div>
+          <div style={{ 
+            width: '40px', 
+            height: '40px', 
+            border: '4px solid var(--border)',
+            borderTop: '4px solid var(--primary)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }} />
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error && !data) {
+    return (
+      <div className="app">
+        <Header passedChecks={0} totalChecks={4} onExport={handleExport} />
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          height: '80vh',
+          flexDirection: 'column',
+          gap: '20px',
+          padding: '20px'
+        }}>
+          <div style={{ fontSize: '18px', color: 'var(--error)', textAlign: 'center' }}>
+            Failed to load simulation data
+          </div>
+          <div style={{ fontSize: '14px', color: 'var(--muted)', textAlign: 'center' }}>
+            {error}
+          </div>
+          <button className="btn" onClick={loadData}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
 
   return (
     <div className="app">
       <Header passedChecks={3} totalChecks={4} onExport={handleExport} />
+
+      {/* Error banner if using fallback data */}
+      {error && useDemoData && (
+        <div style={{
+          background: '#fef3c7',
+          color: '#92400e',
+          padding: '12px 20px',
+          borderBottom: '1px solid #fbbf24',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '10px'
+        }}>
+          <span>⚠️ Backend unavailable. Showing demo data. Error: {error}</span>
+          <button 
+            className="btn"
+            onClick={() => setUseDemoData(false)}
+            style={{ fontSize: '13px', padding: '4px 12px' }}
+          >
+            Retry Backend
+          </button>
+        </div>
+      )}
 
       <div className="layout">
         <Sidebar
@@ -66,6 +195,9 @@ function AppContent() {
           onToggleOutline={setShowOutlines}
           onToggleAutoScale={setAutoScale}
           onToggleComponent={toggleComponent}
+          onRunSimulation={handleRunSimulation}
+          useDemoData={useDemoData}
+          onToggleDemoData={setUseDemoData}
         />
 
         <main>
@@ -135,14 +267,14 @@ function AppContent() {
             <Route path="/power" element={
               <section className="panel active">
                 <div className="cards">
-                  <PowerPlots data={data} visibleComponents={visibleComponents} plotId="powerPlot" />
+                  <PowerVsTime data={data} visibleComponents={visibleComponents} plotId="powerPlot" />
                 </div>
               </section>
             } />
             <Route path="/temp" element={
               <section className="panel active">
                 <div className="cards">
-                  <TemperaturePlots data={data} visibleComponents={visibleComponents} plotId="tempPlot" />
+                  <JunctionCaseTemperature data={data} visibleComponents={visibleComponents} plotId="tempPlot" />
                   <div className="card span-12">
                     <div className="card-header">
                       <div>
@@ -168,7 +300,7 @@ function AppContent() {
             <Route path="/heatmaps" element={
               <section className="panel active">
                 <div className="cards">
-                  <Heatmap
+                  <PCBHeatmaps
                     title="Top Surface Heatmap"
                     field={data.fields.top}
                     footprints={data.footprints}
@@ -176,7 +308,7 @@ function AppContent() {
                     autoScale={autoScale}
                     plotId="heatmapTop"
                   />
-                  <Heatmap
+                  <PCBHeatmaps
                     title="Bottom Surface Heatmap"
                     field={data.fields.bottom}
                     footprints={data.footprints}
@@ -184,7 +316,7 @@ function AppContent() {
                     autoScale={autoScale}
                     plotId="heatmapBottom"
                   />
-                  <Heatmap
+                  <PCBHeatmaps
                     title="Average (Weighted) Heatmap"
                     field={data.fields.avg}
                     footprints={data.footprints}

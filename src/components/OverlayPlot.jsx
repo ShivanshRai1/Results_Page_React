@@ -37,7 +37,7 @@ export const OverlayPlot = ({ data, visibleComponents, plotId = 'overlayPlot', h
 
     const textColor = isDark ? '#ffffff' : '#000000';
 
-    const plotHeight = height + 140; // increase layout height so margins and rangeslider fit
+    const plotHeight = height + 140; // increasing the layout height so margins and rangeslider fit
 
     const layout = {
       margin: { l: 60, r: 60, t: 60, b: 160 },
