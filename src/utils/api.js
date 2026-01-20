@@ -1,6 +1,6 @@
 // API client for thermal simulation backend
 
-const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'https://results-page-backend.onrender.com/api';
 
 /**
  * Check if backend server is running
