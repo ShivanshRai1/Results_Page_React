@@ -79,7 +79,7 @@ def run_simulation(T_AMBIENT=25.0, T_MAX=600, GRID_DX=1.0, GRID_DY=1.0, PCB_K=0.
     cell_area = dx * dy
     alpha_pcb = PCB_K / (PCB_RHO * PCB_C)
     dt_stab = (1 / (2 * alpha_pcb)) * (dx**2 * dy**2) / (dx**2 + dy**2)
-    DT = 0.01 * dt_stab  # Strong stability
+    DT = 0.05 * dt_stab  # Balanced stability/speed for production
     TIME = np.arange(0, T_MAX, DT)
 
     # === Demo Validation Function ===
