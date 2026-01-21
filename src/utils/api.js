@@ -1,6 +1,9 @@
 // API client for thermal simulation backend
 
-const API_BASE_URL = 'https://results-page-backend.onrender.com/api';
+// Use local backend in development, Render backend in production
+const API_BASE_URL = window.location.hostname === 'localhost' 
+  ? 'http://localhost:8000/api'
+  : 'https://results-page-backend.onrender.com/api';
 
 /**
  * Check if backend server is running
@@ -32,6 +35,7 @@ export async function runDefaultSimulation() {
  * Run simulation with custom parameters
  */
 export async function runSimulation(params) {
+  console.log('[THERMAL API] Running simulation with custom parameters');
   const response = await fetch(`${API_BASE_URL}/simulate`, {
     method: 'POST',
     headers: {
@@ -46,6 +50,14 @@ export async function runSimulation(params) {
   }
   
   return response.json();
+}
+
+/**
+ * Helper to run simulation directly from parsed URL payload
+ */
+export async function runSimulationFromUrlPayload(payload) {
+  if (!payload) throw new Error('Invalid URL payload');
+  return runSimulation(payload);
 }
 
 /**

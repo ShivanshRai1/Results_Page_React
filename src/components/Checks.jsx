@@ -86,7 +86,7 @@ export const Checks = ({ data, config }) => {
     };
   }, [data, config]);
 
-  const passedCount = Object.values(checkResults).filter((c) => c.status === 'ok').length;
+  const passedCount = Object.values(checkResults).filter((c) => c.status !== 'bad').length;
   const totalCount = Object.keys(checkResults).length;
 
   return (

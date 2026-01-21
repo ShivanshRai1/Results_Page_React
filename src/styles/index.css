@@ -497,10 +497,11 @@ code.inline {
 .check-table td {
   padding: 6px 4px;
   border-bottom: 1px dashed var(--border);
+  text-align: left;
 }
 
 .check-table td:last-child {
-  text-align: right;
+  text-align: left;
 }
 
 /* Responsive */

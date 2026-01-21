@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 
 # === Simulation Settings ===
 T_AMBIENT_DEFAULT = 25.0
-T_MAX_DEFAULT = 600.0
+T_MAX_DEFAULT = 100.0
 GRID_DX = 1.0  # mm
 GRID_DY = 1.0  # mm
 PCB_K = 0.9       # W/m-K

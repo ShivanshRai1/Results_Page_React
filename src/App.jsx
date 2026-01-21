@@ -10,7 +10,9 @@ import { OverlayPlot } from './components/OverlayPlot';
 import { Checks } from './components/Checks';
 import { generateDemoData } from './utils/demoData';
 import { exportAllCsvs } from './utils/exportCsvs';
-import { runDefaultSimulation, transformBackendData } from './utils/api';
+import { runDefaultSimulation, runSimulationFromUrlPayload, transformBackendData } from './utils/api';
+import { parseUrlToSimulationPayload } from './utils/urlParams';
+import { computeSanityChecks } from './utils/checksLogic';
 
 const config = {
   checks: {
@@ -48,10 +50,18 @@ function AppContent() {
         console.log('[THERMAL] Using STATIC demo data');
         loadedData = generateDemoData();
       } else {
-        // Fetch from backend
-        const backendData = await runDefaultSimulation();
-        loadedData = transformBackendData(backendData);
-        console.log('[THERMAL] ✅ Successfully loaded DYNAMIC data from backend');
+        // If URL contains parameters, run custom simulation; otherwise run default
+        const urlPayload = parseUrlToSimulationPayload();
+        if (urlPayload) {
+          console.log('[URL SIM] Detected URL parameters; running custom simulation');
+          const backendData = await runSimulationFromUrlPayload(urlPayload);
+          loadedData = transformBackendData(backendData);
+          console.log('[URL SIM] ✅ Loaded simulation from URL payload');
+        } else {
+          const backendData = await runDefaultSimulation();
+          loadedData = transformBackendData(backendData);
+          console.log('[THERMAL] ✅ Successfully loaded DYNAMIC data from backend');
+        }
       }
       
       setData(loadedData);
@@ -162,9 +172,12 @@ function AppContent() {
     return null;
   }
 
+  // Calculate passed checks dynamically (ok + warn count as passing, only bad fails)
+  const { passedCount, totalCount } = computeSanityChecks(data, config.checks);
+
   return (
     <div className="app">
-      <Header passedChecks={3} totalChecks={4} onExport={handleExport} />
+      <Header passedChecks={passedCount} totalChecks={totalCount} onExport={handleExport} />
 
       {/* Error banner if using fallback data */}
       {error && useDemoData && (
