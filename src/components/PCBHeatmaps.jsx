@@ -193,30 +193,21 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         ref={containerRef}
         id={plotId}
         style={{ width: '100%', height: '360px', position: 'relative' }}
-      >
-        {isZoomed && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '8px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: 'rgba(0, 0, 0, 0.85)',
-              color: '#fff',
-              padding: '8px 14px',
-              borderRadius: '4px',
-              fontSize: '12px',
-              fontWeight: '500',
-              pointerEvents: 'none',
-              zIndex: 100,
-              whiteSpace: 'nowrap',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
-            }}
-          >
-            Click Reset to return to original view
-          </div>
-        )}
-      </div>
+      />
+      {isZoomed && (
+        <div
+          style={{
+            marginTop: '6px',
+            fontSize: '12px',
+            fontWeight: '500',
+            color: isDark ? '#cbd5e1' : '#334155',
+            textAlign: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          Zoom active — click Reset to return
+        </div>
+      )}
     </div>
   );
 };
