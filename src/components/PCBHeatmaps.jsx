@@ -104,12 +104,15 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       annotations,
       plot_bgcolor: 'transparent',
       paper_bgcolor: 'transparent',
+      dragmode: 'zoom',
     };
 
     Plotly.newPlot(containerRef.current, data, layout, {
-      displayModeBar: false,
+      displayModeBar: true,
+      modeBarButtonsToRemove: ['toImage', 'sendDataToCloud', 'lasso2d', 'select2d'],
       responsive: true,
-      doubleClick: false,
+      doubleClick: 'reset',
+      scrollZoom: true,
     });
 
     const handleRelayout = (eventData) => {
@@ -195,14 +198,14 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
           <div
             style={{
               position: 'absolute',
-              top: '50%',
+              top: '8px',
               left: '50%',
-              transform: 'translate(-50%, -50%)',
-              background: 'rgba(0, 0, 0, 0.8)',
+              transform: 'translateX(-50%)',
+              background: 'rgba(0, 0, 0, 0.85)',
               color: '#fff',
-              padding: '12px 16px',
-              borderRadius: '6px',
-              fontSize: '14px',
+              padding: '8px 14px',
+              borderRadius: '4px',
+              fontSize: '12px',
               fontWeight: '500',
               pointerEvents: 'none',
               zIndex: 100,
