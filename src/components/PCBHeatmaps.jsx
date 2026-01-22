@@ -37,6 +37,24 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         }))
       : [];
 
+    const annotations = showOutlines
+      ? footprints.map((fp) => ({
+          x: fp.x + fp.l / 2,
+          y: fp.y + fp.w / 2,
+          text: fp.name,
+          showarrow: false,
+          font: {
+            color: 'white',
+            size: 10,
+            family: 'monospace',
+            weight: 'bold',
+          },
+          bgcolor: 'rgba(0, 0, 0, 0.6)',
+          borderpad: 3,
+          borderwidth: 0,
+        }))
+      : [];
+
     const colorMin = autoScale ? min : (min + max) * 0.25;
     const colorMax = autoScale ? max : (min + max) * 0.85;
 
@@ -76,6 +94,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         constrainaxis: 'range',
       },
       shapes,
+      annotations,
       plot_bgcolor: 'transparent',
       paper_bgcolor: 'transparent',
     };
