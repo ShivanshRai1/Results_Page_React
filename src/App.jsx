@@ -320,6 +320,7 @@ function AppContent() {
                     showOutlines={showOutlines}
                     autoScale={autoScale}
                     plotId="heatmapTop"
+                    grid={data.grid}
                   />
                   <PCBHeatmaps
                     title="Bottom Surface Heatmap"
@@ -328,6 +329,7 @@ function AppContent() {
                     showOutlines={showOutlines}
                     autoScale={autoScale}
                     plotId="heatmapBottom"
+                    grid={data.grid}
                   />
                   <PCBHeatmaps
                     title="Average (Weighted) Heatmap"
@@ -336,6 +338,7 @@ function AppContent() {
                     showOutlines={showOutlines}
                     autoScale={autoScale}
                     plotId="heatmapAvg"
+                    grid={data.grid}
                   />
                 </div>
               </section>

@@ -106,6 +106,10 @@ export function transformBackendData(backendData) {
       ny: grid.ny,
       dx: grid.dx,
       dy: grid.dy,
+      x_min: grid.x_min,
+      x_max: grid.x_max,
+      y_min: grid.y_min,
+      y_max: grid.y_max,
     },
     fields: {
       top: fields.top,

@@ -3,7 +3,7 @@ import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
 import { useTheme } from './ThemeContext';
 
-export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale, plotId }) => {
+export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale, plotId, grid }) => {
   const containerRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
@@ -11,9 +11,11 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
   const handleReset = () => {
     if (containerRef.current) {
+      const xRange = grid ? [grid.x_min, grid.x_max] : [0, 40];
+      const yRange = grid ? [grid.y_min, grid.y_max] : [0, 40];
       Plotly.relayout(containerRef.current, {
-        'xaxis.range': [0, 40],
-        'yaxis.range': [0, 40],
+        'xaxis.range': xRange,
+        'yaxis.range': yRange,
       });
       setIsZoomed(false);
     }
@@ -73,22 +75,27 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
     const textColor = isDark ? '#ffffff' : '#000000';
 
+    const xRange = grid ? [grid.x_min, grid.x_max] : [0, 40];
+    const yRange = grid ? [grid.y_min, grid.y_max] : [0, 40];
+    const xSpan = xRange[1] - xRange[0];
+    const dtick = Math.max(10, Math.round(xSpan / 5));
+
     const layout = {
       margin: { l: 40, r: 60, t: 10, b: 40 },
       xaxis: {
         title: 'x (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
-        range: [0, 40],
-        dtick: 10,
+        range: xRange,
+        dtick: dtick,
         constrainaxis: 'range',
       },
       yaxis: {
         title: 'y (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
-        range: [0, 40],
-        dtick: 10,
+        range: yRange,
+        dtick: dtick,
         scaleanchor: 'x',
         scaleratio: 1,
         constrainaxis: 'range',
@@ -106,20 +113,22 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
     });
 
     const handleRelayout = (eventData) => {
+      const xRange = grid ? [grid.x_min, grid.x_max] : [0, 40];
+      const yRange = grid ? [grid.y_min, grid.y_max] : [0, 40];
       let reset = false;
       let update = {};
       if (
         eventData['xaxis.range[0]'] !== undefined &&
-        (eventData['xaxis.range[0]'] < 0 || eventData['xaxis.range[1]'] > 40)
+        (eventData['xaxis.range[0]'] < xRange[0] || eventData['xaxis.range[1]'] > xRange[1])
       ) {
-        update['xaxis.range'] = [0, 40];
+        update['xaxis.range'] = xRange;
         reset = true;
       }
       if (
         eventData['yaxis.range[0]'] !== undefined &&
-        (eventData['yaxis.range[0]'] < 0 || eventData['yaxis.range[1]'] > 40)
+        (eventData['yaxis.range[0]'] < yRange[0] || eventData['yaxis.range[1]'] > yRange[1])
       ) {
-        update['yaxis.range'] = [0, 40];
+        update['yaxis.range'] = yRange;
         reset = true;
       }
       if (reset && containerRef.current) {
@@ -142,7 +151,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         Plotly.purge(containerRef.current);
       }
     };
-  }, [field, footprints, showOutlines, autoScale, isDark]);
+  }, [field, footprints, showOutlines, autoScale, isDark, grid]);
 
   return (
     <div className="card span-4">
