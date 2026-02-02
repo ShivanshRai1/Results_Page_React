@@ -25,6 +25,7 @@ const config = {
 function AppContent() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState(null);
   const [useDemoData, setUseDemoData] = useState(false);
   const [showOutlines, setShowOutlines] = useState(true);
@@ -39,8 +40,23 @@ function AppContent() {
     loadData();
   }, [useDemoData]);
 
+  useEffect(() => {
+    if (!loading) return;
+
+    setLoadingProgress(0);
+    const start = Date.now();
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const pct = Math.min(95, Math.floor((elapsed / 60000) * 100));
+      setLoadingProgress(pct);
+    }, 500);
+
+    return () => clearInterval(intervalId);
+  }, [loading]);
+
   const loadData = async () => {
     setLoading(true);
+    setLoadingProgress(0);
     setError(null);
     
     try {
@@ -75,6 +91,7 @@ function AppContent() {
       setVisibleComponents(new Set(fallbackData.components.map((c) => c.name)));
       setUseDemoData(true);
     } finally {
+      setLoadingProgress(100);
       setLoading(false);
     }
   };
@@ -126,6 +143,9 @@ function AppContent() {
         }}>
           <div style={{ fontSize: '18px', color: 'var(--muted)' }}>
             Running thermal simulation...
+          </div>
+          <div style={{ fontSize: '14px', color: 'var(--muted)' }}>
+            {loadingProgress}%
           </div>
           <div style={{ 
             width: '40px', 
