@@ -44,10 +44,20 @@ function AppContent() {
     if (!loading) return;
 
     setLoadingProgress(0);
+    let expectedMs = 30000;
+    try {
+      const stored = Number(localStorage.getItem('lastSimulationMs'));
+      if (Number.isFinite(stored) && stored > 0) {
+        expectedMs = Math.min(180000, Math.max(10000, stored * 1.1));
+      }
+    } catch {
+      // ignore storage errors
+    }
+
     const start = Date.now();
     const intervalId = setInterval(() => {
       const elapsed = Date.now() - start;
-      const pct = Math.min(95, Math.floor((elapsed / 60000) * 100));
+      const pct = Math.min(95, Math.floor((elapsed / expectedMs) * 100));
       setLoadingProgress(pct);
     }, 500);
 

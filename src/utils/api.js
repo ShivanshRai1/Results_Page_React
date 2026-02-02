@@ -30,6 +30,11 @@ export async function runDefaultSimulation() {
   }
   const data = await response.json();
   const elapsedMs = performance.now() - start;
+  try {
+    localStorage.setItem('lastSimulationMs', String(Math.round(elapsedMs)));
+  } catch {
+    // ignore storage errors
+  }
   console.log(`[THERMAL API] ✅ Completed in ${(elapsedMs / 1000).toFixed(1)}s`);
   return data;
 }
@@ -55,6 +60,11 @@ export async function runSimulation(params) {
   
   const data = await response.json();
   const elapsedMs = performance.now() - start;
+  try {
+    localStorage.setItem('lastSimulationMs', String(Math.round(elapsedMs)));
+  } catch {
+    // ignore storage errors
+  }
   console.log(`[THERMAL API] ✅ Completed in ${(elapsedMs / 1000).toFixed(1)}s`);
   return data;
 }
