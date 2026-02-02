@@ -7,20 +7,12 @@ from matplotlib.colors import PowerNorm
 import math
 import base64
 import json
-import time
 from io import BytesIO
 
 components_input_override = []
 
 def run_simulation(T_AMBIENT=25.0, T_MAX=600, GRID_DX=1.0, GRID_DY=1.0, PCB_K=0.9, PCB_C=1100, PCB_RHO=1800, PCB_THICKNESS=1.6, AMBIENT_H_TOP=5.0, AMBIENT_H_BOTTOM=5.0, margin=10):
     global components_input_override
-
-    def _fmt_duration(seconds):
-        minutes = int(seconds // 60)
-        secs = seconds - (minutes * 60)
-        return f"{minutes} min {secs:.1f} sec" if minutes else f"{secs:.1f} sec"
-
-    start_total = time.perf_counter()
 
     # === Power Profiles ===
     def constant_power(p):
@@ -234,7 +226,6 @@ def run_simulation(T_AMBIENT=25.0, T_MAX=600, GRID_DX=1.0, GRID_DY=1.0, PCB_K=0.
     }
 
     components = [ComponentRC(*params) for params in components_input]
-    t_after_components = time.perf_counter()
 
     # === Grid Setup ===
     x_min = min(c.pos[0] for c in components) - margin
@@ -261,8 +252,6 @@ def run_simulation(T_AMBIENT=25.0, T_MAX=600, GRID_DX=1.0, GRID_DY=1.0, PCB_K=0.
         ix1 = int((x0 + l - x_min) / GRID_DX)
         iy1 = int((y0 + w - y_min) / GRID_DY)
         component_footprints.append((ix0, ix1, iy0, iy1))
-
-    t_after_grid = time.perf_counter()
 
     for t_idx, t in enumerate(TIME):
         for comp in components:
@@ -317,8 +306,6 @@ def run_simulation(T_AMBIENT=25.0, T_MAX=600, GRID_DX=1.0, GRID_DY=1.0, PCB_K=0.
         if t_idx % max(1, int(len(TIME) / 10)) == 0:
             print(f"Simulation {100 * t_idx / len(TIME):.0f}% completed")
 
-    t_after_sim = time.perf_counter()
-
     # === T_avg Calculation ===
     T_avg = (AMBIENT_H_TOP * T_top + AMBIENT_H_BOTTOM * T_bottom) / (AMBIENT_H_TOP + AMBIENT_H_BOTTOM)
 
@@ -332,8 +319,6 @@ def run_simulation(T_AMBIENT=25.0, T_MAX=600, GRID_DX=1.0, GRID_DY=1.0, PCB_K=0.
     for t_idx, t in enumerate(TIME):
         for comp in components:
             comp.update(t)
-
-    t_after_recalc = time.perf_counter()
 
     # Safely gather logs
     logs = []
@@ -393,8 +378,6 @@ def run_simulation(T_AMBIENT=25.0, T_MAX=600, GRID_DX=1.0, GRID_DY=1.0, PCB_K=0.
     img_power = base64.b64encode(buf.read()).decode('utf-8')
     plt.close(fig_power)
 
-    t_after_plots = time.perf_counter()
-
     # === Final Images Dictionary ===
     images = {
         "Top Surface": plot_heatmap_autoscale(T_top, "Top Surface Temperature"),
@@ -424,14 +407,6 @@ def run_simulation(T_AMBIENT=25.0, T_MAX=600, GRID_DX=1.0, GRID_DY=1.0, PCB_K=0.
                 "C_c": comp.C_c,
             },
         })
-
-    end_total = time.perf_counter()
-    print("[TIMER] Component init:", _fmt_duration(t_after_components - start_total))
-    print("[TIMER] Grid setup:", _fmt_duration(t_after_grid - t_after_components))
-    print("[TIMER] Field simulation:", _fmt_duration(t_after_sim - t_after_grid))
-    print("[TIMER] Component recalc:", _fmt_duration(t_after_recalc - t_after_sim))
-    print("[TIMER] Plotting:", _fmt_duration(t_after_plots - t_after_recalc))
-    print("[TIMER] Total:", _fmt_duration(end_total - start_total))
 
     # === Return complete data structure ===
     return {

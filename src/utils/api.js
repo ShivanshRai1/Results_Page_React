@@ -21,14 +21,17 @@ export async function checkHealth() {
  */
 export async function runDefaultSimulation() {
   console.log('[THERMAL API] Fetching simulation data from backend...');
+  const start = performance.now();
   const response = await fetch(`${API_BASE_URL}/simulate/default`);
   if (!response.ok) {
     const error = await response.json();
     console.error('[THERMAL API] Backend request failed:', error);
     throw new Error(error.detail || 'Simulation failed');
   }
-  console.log('[THERMAL API] ✅ Successfully received DYNAMIC data from backend');
-  return response.json();
+  const data = await response.json();
+  const elapsedMs = performance.now() - start;
+  console.log(`[THERMAL API] ✅ Completed in ${(elapsedMs / 1000).toFixed(1)}s`);
+  return data;
 }
 
 /**
@@ -36,6 +39,7 @@ export async function runDefaultSimulation() {
  */
 export async function runSimulation(params) {
   console.log('[THERMAL API] Running simulation with custom parameters');
+  const start = performance.now();
   const response = await fetch(`${API_BASE_URL}/simulate`, {
     method: 'POST',
     headers: {
@@ -49,7 +53,10 @@ export async function runSimulation(params) {
     throw new Error(error.detail || 'Simulation failed');
   }
   
-  return response.json();
+  const data = await response.json();
+  const elapsedMs = performance.now() - start;
+  console.log(`[THERMAL API] ✅ Completed in ${(elapsedMs / 1000).toFixed(1)}s`);
+  return data;
 }
 
 /**
