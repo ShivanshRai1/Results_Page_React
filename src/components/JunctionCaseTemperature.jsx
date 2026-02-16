@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import Plotly from 'plotly.js-dist-min';
 import { useTheme } from './ThemeContext';
 
-export const JunctionCaseTemperature = ({ data, visibleComponents, plotId = 'tempPlot' }) => {
+export const JunctionCaseTemperature = ({ data, visibleComponents, plotId = 'tempPlot', onToggleComponent }) => {
   const containerRef = useRef(null);
   const { isDark } = useTheme();
 
@@ -92,12 +92,37 @@ export const JunctionCaseTemperature = ({ data, visibleComponents, plotId = 'tem
           <div className="meta">Per-component junction & case curves. Click legends to toggle.</div>
         </div>
         <div className="legend">
-          {data.components.map((c) => (
-            <span key={c.name}>
-              <span className="swatch" style={{ background: c.color }}></span>
-              {c.name}
-            </span>
-          ))}
+          {data.components.map((c) => {
+            const selected = visibleComponents.has(c.name);
+            return (
+              <span
+                key={c.name}
+                onClick={() => onToggleComponent && onToggleComponent(c.name)}
+                style={{
+                  cursor: 'pointer',
+                  opacity: selected ? 1 : 0.4,
+                  fontWeight: selected ? 600 : 400,
+                  marginRight: 12,
+                  userSelect: 'none',
+                }}
+                title={selected ? 'Hide this component' : 'Show this component'}
+              >
+                <span
+                  className="swatch"
+                  style={{
+                    background: c.color,
+                    border: selected ? '2px solid #333' : '2px solid #ccc',
+                    display: 'inline-block',
+                    width: 14,
+                    height: 14,
+                    marginRight: 6,
+                    verticalAlign: 'middle',
+                  }}
+                ></span>
+                {c.name}
+              </span>
+            );
+          })}
         </div>
       </div>
       <div ref={containerRef} id={plotId} style={{ width: '100%', height: `${baseHeight + 140}px` }} />

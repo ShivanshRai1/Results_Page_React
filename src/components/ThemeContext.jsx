@@ -2,8 +2,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 
 const ThemeContext = createContext(null);
 
-export const ThemeProvider = ({ children }) => {
-  const [isDark, setIsDark] = useState(true);
+function ThemeProviderComponent({ children }) {
+  const [isDark, setIsDark] = useState(false);
 
   // Sync DOM class when isDark changes
   useEffect(() => {
@@ -23,12 +23,16 @@ export const ThemeProvider = ({ children }) => {
       {children}
     </ThemeContext.Provider>
   );
-};
+}
 
-export const useTheme = () => {
+export const ThemeProvider = ThemeProviderComponent;
+
+function useThemeHook() {
   const context = useContext(ThemeContext);
   if (!context) {
     throw new Error('useTheme must be used within ThemeProvider');
   }
   return context;
-};
+}
+
+export const useTheme = useThemeHook;

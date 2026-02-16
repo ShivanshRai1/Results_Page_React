@@ -310,14 +310,24 @@ function AppContent() {
             <Route path="/power" element={
               <section className="panel active">
                 <div className="cards">
-                  <PowerVsTime data={data} visibleComponents={visibleComponents} plotId="powerPlot" />
+                  <PowerVsTime
+                    data={data}
+                    visibleComponents={visibleComponents}
+                    plotId="powerPlot"
+                    onToggleComponent={toggleComponent}
+                  />
                 </div>
               </section>
             } />
             <Route path="/temp" element={
               <section className="panel active">
                 <div className="cards">
-                  <JunctionCaseTemperature data={data} visibleComponents={visibleComponents} plotId="tempPlot" />
+                  <JunctionCaseTemperature
+                    data={data}
+                    visibleComponents={visibleComponents}
+                    plotId="tempPlot"
+                    onToggleComponent={toggleComponent}
+                  />
                   <div className="card span-12">
                     <div className="card-header">
                       <div>
