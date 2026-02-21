@@ -157,7 +157,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
   }, [field, footprints, showOutlines, autoScale, isDark, grid]);
 
   return (
-    <div className="card span-4">
+    <div className="card span-12">
       <div className="card-header">
         <div>
           <h2>{title}</h2>
