@@ -62,7 +62,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       {
         z: field,
         type: 'heatmap',
-        colorscale: 'Plasma',
+        colorscale: 'Turbo',
         showscale: true,
         zsmooth: false,
         zmin: colorMin,
