@@ -58,11 +58,22 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
     const colorMin = autoScale ? min : (min + max) * 0.25;
     const colorMax = autoScale ? max : (min + max) * 0.85;
 
+    const thermalColorscale = [
+      [0.0, '#0b0b2e'],
+      [0.12, '#1f1172'],
+      [0.28, '#5b1fa6'],
+      [0.42, '#a4249f'],
+      [0.58, '#e33b62'],
+      [0.72, '#f07b3f'],
+      [0.86, '#f7c844'],
+      [1.0, '#fff1b0'],
+    ];
+
     const data = [
       {
         z: field,
         type: 'heatmap',
-        colorscale: 'Turbo',
+        colorscale: thermalColorscale,
         showscale: true,
         zsmooth: false,
         zmin: colorMin,

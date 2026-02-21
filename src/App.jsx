@@ -114,6 +114,7 @@ function AppContent() {
   const getActiveTabFromPath = () => {
     const path = location.pathname;
     if (path.includes('power')) return 'power';
+    if (path.includes('grid')) return 'grid';
     if (path.includes('temp')) return 'temp';
     if (path.includes('heatmaps')) return 'heatmaps';
     if (path.includes('checks')) return 'checks';
@@ -233,16 +234,6 @@ function AppContent() {
       )}
 
       <div className="layout">
-        <Sidebar
-          data={data}
-          onToggleOutline={setShowOutlines}
-          onToggleAutoScale={setAutoScale}
-          onToggleComponent={toggleComponent}
-          onRunSimulation={handleRunSimulation}
-          useDemoData={useDemoData}
-          onToggleDemoData={setUseDemoData}
-        />
-
         <main>
           <div className="tabs" role="tablist">
             <Link
@@ -255,6 +246,17 @@ function AppContent() {
               }}
             >
               Power vs time
+            </Link>
+            <Link
+              to="/grid"
+              className={`tab ${activeTab === 'grid' ? 'active' : ''}`}
+              role="tab"
+              aria-selected={activeTab === 'grid'}
+              onClick={(e) => {
+                navigate('/grid');
+              }}
+            >
+              PCB/Grid information
             </Link>
             <Link
               to="/temp"
@@ -300,6 +302,7 @@ function AppContent() {
             marginBottom: '20px'
           }}>
             {activeTab === 'power' && 'Power dissipation and energy consumption metrics for each component over time'}
+            {activeTab === 'grid' && 'PCB layout, grid configuration, and component visibility controls'}
             {activeTab === 'temp' && 'Junction/case temperature profiles for all components over time'}
             {activeTab === 'heatmaps' && 'Spatial temperature distribution across PCB surfaces showing hotspots and thermal gradients'}
             {activeTab === 'checks' && 'Validation checks for thermal steady-state, energy conservation, and component ratings'}
@@ -315,6 +318,20 @@ function AppContent() {
                     visibleComponents={visibleComponents}
                     plotId="powerPlot"
                     onToggleComponent={toggleComponent}
+                  />
+                </div>
+              </section>
+            } />
+            <Route path="/grid" element={
+              <section className="panel active grid-tab">
+                <div className="cards">
+                  <Sidebar
+                    data={data}
+                    onToggleComponent={toggleComponent}
+                    variant="grid"
+                    onRunSimulation={handleRunSimulation}
+                    useDemoData={useDemoData}
+                    onToggleDemoData={setUseDemoData}
                   />
                 </div>
               </section>
@@ -353,6 +370,40 @@ function AppContent() {
             <Route path="/heatmaps" element={
               <section className="panel active">
                 <div className="cards">
+                  <div className="card span-12">
+                    <div className="card-header">
+                      <div>
+                        <h2>View</h2>
+                        <div className="meta">Heatmap display options</div>
+                      </div>
+                    </div>
+                    <div style={{ padding: '8px 0' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
+                        <input
+                          type="checkbox"
+                          checked={showOutlines}
+                          onChange={(e) => setShowOutlines(e.target.checked)}
+                        />
+                        Show footprints on heatmaps
+                      </label>
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          fontSize: '14px',
+                          marginTop: '6px',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={autoScale}
+                          onChange={(e) => setAutoScale(e.target.checked)}
+                        />
+                        Autoscale color range
+                      </label>
+                    </div>
+                  </div>
                   <PCBHeatmaps
                     title="Top Surface Heatmap"
                     field={data.fields.top}

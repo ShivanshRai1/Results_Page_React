@@ -180,13 +180,20 @@ header {
 }
 
 /* Layout */
+
 .layout {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 1fr;
   gap: 18px;
   padding: 18px;
   align-items: start;
   flex: 1;
+}
+
+.grid-tab aside {
+  position: static;
+  top: auto;
+  max-width: 420px;
 }
 
 aside {
@@ -234,6 +241,17 @@ aside h3 {
 
 .checklist input[type="checkbox"] {
   cursor: pointer;
+}
+
+.grid-details {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.grid-card .checklist {
+  padding-top: 2px;
 }
 
 /* Main content */
