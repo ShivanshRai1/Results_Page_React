@@ -11,11 +11,9 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
   const handleReset = () => {
     if (containerRef.current) {
-      const xRange = grid ? [grid.x_min, grid.x_max] : [0, 40];
-      const yRange = grid ? [grid.y_min, grid.y_max] : [0, 40];
       Plotly.relayout(containerRef.current, {
-        'xaxis.range': xRange,
-        'yaxis.range': yRange,
+        'xaxis.autorange': true,
+        'yaxis.autorange': true,
       });
       setIsZoomed(false);
     }
