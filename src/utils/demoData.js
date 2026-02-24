@@ -87,8 +87,15 @@ export const generateDemoData = () => {
     { name: 'T1_Parabolic', x: 5, y: 10, l: 6, w: 6 },
   ];
 
+  // Calculate grid bounds from footprints
+  const margin = 5;
+  const x_min = Math.min(...footprints.map(fp => fp.x)) - margin;
+  const x_max = Math.max(...footprints.map(fp => fp.x + fp.l)) + margin;
+  const y_min = Math.min(...footprints.map(fp => fp.y)) - margin;
+  const y_max = Math.max(...footprints.map(fp => fp.y + fp.w)) + margin;
+
   return {
-    grid: { nx, ny, dx: 1, dy: 1 },
+    grid: { nx, ny, dx: 1, dy: 1, x_min, x_max, y_min, y_max },
     fields: { top, bottom, avg },
     time: t,
     power,
