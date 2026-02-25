@@ -69,9 +69,24 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       [1.0, '#fff1b0'],
     ];
 
+    const textColor = isDark ? '#ffffff' : '#000000';
+
+    const xRange = grid ? [grid.x_min, grid.x_max] : [0, 40];
+    const yRange = grid ? [grid.y_min, grid.y_max] : [0, 40];
+    const xSpan = xRange[1] - xRange[0];
+    const dtick = Math.max(10, Math.round(xSpan / 5));
+
+    // Map each grid cell index to physical mm so shapes/annotations align
+    const nx = field[0]?.length ?? 1;
+    const ny = field.length ?? 1;
+    const xCoords = Array.from({ length: nx }, (_, i) => xRange[0] + (i / (nx - 1)) * (xRange[1] - xRange[0]));
+    const yCoords = Array.from({ length: ny }, (_, j) => yRange[0] + (j / (ny - 1)) * (yRange[1] - yRange[0]));
+
     const data = [
       {
         z: field,
+        x: xCoords,
+        y: yCoords,
         type: 'heatmap',
         colorscale: thermalColorscale,
         showscale: true,
@@ -81,13 +96,6 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         colorbar: { title: '°C' },
       },
     ];
-
-    const textColor = isDark ? '#ffffff' : '#000000';
-
-    const xRange = grid ? [grid.x_min, grid.x_max] : [0, 40];
-    const yRange = grid ? [grid.y_min, grid.y_max] : [0, 40];
-    const xSpan = xRange[1] - xRange[0];
-    const dtick = Math.max(10, Math.round(xSpan / 5));
 
     const layout = {
       margin: { l: 40, r: 60, t: 10, b: 40 },

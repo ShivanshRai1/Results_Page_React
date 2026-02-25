@@ -4,33 +4,6 @@ export const generateDemoData = () => {
   const nx = 55;
   const ny = 42;
 
-  // Generate 2D temperature fields with synthetic gaussians
-  const makeField = (bias = 0) => {
-    const z = [];
-    for (let j = 0; j < ny; j++) {
-      const row = [];
-      for (let i = 0; i < nx; i++) {
-        const r = Math.hypot(i - nx * 0.35, j - ny * 0.6);
-        const r2 = Math.hypot(i - nx * 0.7, j - ny * 0.3);
-        const val =
-          25 +
-          bias +
-          40 * Math.exp(-r / 12) +
-          22 * Math.exp(-r2 / 10) +
-          3 * Math.random();
-        row.push(val);
-      }
-      z.push(row);
-    }
-    return z;
-  };
-
-  const top = makeField(0.5);
-  const bottom = makeField(-0.5);
-  const avg = top.map((row, j) =>
-    row.map((v, i) => 0.6 * top[j][i] + 0.4 * bottom[j][i])
-  );
-
   const comps = [
     { name: 'Q1_SquarePulse', color: '#4f46e5' },
     { name: 'D1_Constant', color: '#16a34a' },
@@ -87,12 +60,44 @@ export const generateDemoData = () => {
     { name: 'T1_Parabolic', x: 5, y: 10, l: 6, w: 6 },
   ];
 
-  // Calculate grid bounds from footprints
+  // Grid bounds derived from footprint extents + margin
   const margin = 5;
-  const x_min = Math.min(...footprints.map(fp => fp.x)) - margin;
-  const x_max = Math.max(...footprints.map(fp => fp.x + fp.l)) + margin;
-  const y_min = Math.min(...footprints.map(fp => fp.y)) - margin;
-  const y_max = Math.max(...footprints.map(fp => fp.y + fp.w)) + margin;
+  const x_min = Math.min(...footprints.map((fp) => fp.x)) - margin;
+  const x_max = Math.max(...footprints.map((fp) => fp.x + fp.l)) + margin;
+  const y_min = Math.min(...footprints.map((fp) => fp.y)) - margin;
+  const y_max = Math.max(...footprints.map((fp) => fp.y + fp.w)) + margin;
+
+  // Gaussian peaks placed at footprint centers in physical mm space
+  const hotspotAmps = { Q1_SquarePulse: 38, D1_Constant: 18, U1_Sinusoidal: 32, T1_Parabolic: 15 };
+  const makeField = (bias = 0, spread = 1.0) => {
+    const hotspots = footprints.map((fp) => ({
+      cx: fp.x + fp.l / 2,
+      cy: fp.y + fp.w / 2,
+      sigma: Math.max(fp.l, fp.w) * 1.1 * spread,
+      amp: hotspotAmps[fp.name] ?? 20,
+    }));
+    const z = [];
+    for (let j = 0; j < ny; j++) {
+      const row = [];
+      const y = y_min + (j / (ny - 1)) * (y_max - y_min);
+      for (let i = 0; i < nx; i++) {
+        const x = x_min + (i / (nx - 1)) * (x_max - x_min);
+        let val = 25 + bias;
+        for (const h of hotspots) {
+          const r2 = (x - h.cx) ** 2 + (y - h.cy) ** 2;
+          val += h.amp * Math.exp(-r2 / (2 * h.sigma ** 2));
+        }
+        val += 2 * Math.random();
+        row.push(val);
+      }
+      z.push(row);
+    }
+    return z;
+  };
+
+  const top = makeField(0.5, 1.0);
+  const bottom = makeField(-0.5, 1.1);
+  const avg = top.map((row, j) => row.map((v, i) => 0.6 * top[j][i] + 0.4 * bottom[j][i]));
 
   return {
     grid: { nx, ny, dx: 1, dy: 1, x_min, x_max, y_min, y_max },
