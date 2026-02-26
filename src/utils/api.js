@@ -88,6 +88,7 @@ export function transformBackendData(backendData) {
   const componentsFormatted = components.map((comp, idx) => ({
     name: comp.name,
     color: colors[idx % colors.length],
+    thermal: comp.thermal,
   }));
   
   // Create power object

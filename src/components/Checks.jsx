@@ -16,11 +16,16 @@ export const Checks = ({ data, config }) => {
     setExpandedChecks(newSet);
   };
   const checkResults = useMemo(() => {
+    const ambient = Number.isFinite(data?.meta?.ambient) ? data.meta.ambient : 25;
+
     // Steady-state check
     const steadyRows = data.components.map((c) => {
       const arr = data.temps[c.name];
       const got = arr[arr.length - 1];
-      const exp = 25 + average(data.power[c.name]) * (1.0 + 3.0);
+      const rthJc = c?.thermal?.Rth_jc;
+      const rthCa = c?.thermal?.Rth_ca;
+      const totalRth = Number.isFinite(rthJc) && Number.isFinite(rthCa) ? (rthJc + rthCa) : 4.0;
+      const exp = ambient + average(data.power[c.name]) * totalRth;
       const err = (100 * Math.abs(got - exp)) / Math.max(1, exp);
       return [c.name, `${fmt(exp)}°C`, `${fmt(got)}°C`, `${fmt(err)}%`];
     });
