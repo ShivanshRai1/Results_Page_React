@@ -18,7 +18,7 @@ export const OverlayPlot = ({ data, visibleComponents, plotId = 'overlayPlot', h
         mode: 'lines',
         name: `${c.name} — Tj`,
         line: { color: c.color, width: 2 },
-        hovertemplate: 't=%{x:.2f}s<br>Tj=%{y:.2f}°C<extra></extra>',
+        hovertemplate: `<b>${c.name}</b> — Tj<br>t=%{x:.2f}s<br>Tj=%{y:.2f}°C<extra></extra>`,
       }));
 
     const powerTraces = data.components
@@ -30,7 +30,7 @@ export const OverlayPlot = ({ data, visibleComponents, plotId = 'overlayPlot', h
         mode: 'lines',
         name: `${c.name} — P`,
         line: { color: c.color, width: 2, dash: 'dot' },
-        hovertemplate: 't=%{x:.2f}s<br>P=%{y:.2f}W<extra></extra>',
+        hovertemplate: `<b>${c.name}</b> — P<br>t=%{x:.2f}s<br>P=%{y:.2f}W<extra></extra>`,
         yaxis: 'y2',
         opacity: 0.9,
       }));

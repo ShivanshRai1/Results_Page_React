@@ -22,7 +22,7 @@ export const JunctionCaseTemperature = ({ data, visibleComponents, plotId = 'tem
           mode: 'lines',
           name: `${c.name} — Tj`,
           line: { color: c.color, width: 2 },
-          hovertemplate: 't=%{x:.2f}s<br>Tj=%{y:.2f}°C<extra></extra>',
+          hovertemplate: `<b>${c.name}</b> — Tj<br>t=%{x:.2f}s<br>Tj=%{y:.2f}°C<extra></extra>`,
         },
         {
           x: data.time,
@@ -31,7 +31,7 @@ export const JunctionCaseTemperature = ({ data, visibleComponents, plotId = 'tem
           mode: 'lines',
           name: `${c.name} — Tc`,
           line: { color: c.color, width: 2, dash: 'dash' },
-          hovertemplate: 't=%{x:.2f}s<br>Tc=%{y:.2f}°C<extra></extra>',
+          hovertemplate: `<b>${c.name}</b> — Tc<br>t=%{x:.2f}s<br>Tc=%{y:.2f}°C<extra></extra>`,
         },
       ]);
 

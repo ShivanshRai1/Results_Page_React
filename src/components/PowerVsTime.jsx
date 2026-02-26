@@ -21,7 +21,7 @@ export const PowerVsTime = ({ data, visibleComponents, plotId = 'powerPlot', onT
         mode: 'lines',
         name: c.name,
         line: { color: c.color, width: 2 },
-        hovertemplate: 't=%{x:.2f}s<br>P=%{y:.2f}W<extra></extra>',
+        hovertemplate: `<b>${c.name}</b><br>t=%{x:.2f}s<br>P=%{y:.2f}W<extra></extra>`,
       }));
 
     const textColor = isDark ? '#ffffff' : '#000000';
