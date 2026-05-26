@@ -70,48 +70,32 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
   const containerRef = useRef(null);
   const clampingRef = useRef(false);
   const boundsRef = useRef(getGridBounds(grid));
-  const plotSnapshotRef = useRef(null);
+  const mountPlotRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
 
   const resetPlotView = () => {
     const plotEl = containerRef.current;
-    const snapshot = plotSnapshotRef.current;
-    if (!plotEl || !snapshot) return;
+    const mountPlot = mountPlotRef.current;
+    if (!plotEl || !mountPlot) return;
 
-    const bounds = boundsRef.current;
     clampingRef.current = true;
+    plotEl.removeAllListeners('plotly_relayout');
+    Plotly.purge(plotEl);
 
-    const resetLayout = {
-      ...snapshot.layout,
-      xaxis: {
-        ...snapshot.layout.xaxis,
-        range: [bounds.x[0], bounds.x[1]],
-        autorange: false,
-      },
-      yaxis: {
-        ...snapshot.layout.yaxis,
-        range: [bounds.y[0], bounds.y[1]],
-        autorange: false,
-        scaleanchor: 'x',
-        scaleratio: 1,
-      },
-    };
-
-    Plotly.react(plotEl, snapshot.data, resetLayout, snapshot.config).finally(() => {
-      clampingRef.current = false;
-      setIsZoomed(false);
-    });
+    mountPlot(plotEl)
+      .finally(() => {
+        clampingRef.current = false;
+        setIsZoomed(false);
+      });
   };
 
   useEffect(() => {
-    if (!containerRef.current) return;
-
     const bounds = getGridBounds(grid);
     boundsRef.current = bounds;
-    const xRange = bounds.x;
-    const yRange = bounds.y;
+    const xRange = [...bounds.x];
+    const yRange = [...bounds.y];
 
     const shapes = showOutlines
       ? footprints.map((fp) => ({
@@ -165,7 +149,6 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
     const xSpan = xRange[1] - xRange[0];
     const dtick = Math.max(10, Math.round(xSpan / 5));
 
-    // Map each grid cell index to physical mm so shapes/annotations align
     const nx = field[0]?.length ?? 1;
     const ny = field.length ?? 1;
     const xCoords = Array.from({ length: nx }, (_, i) =>
@@ -190,36 +173,32 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       },
     ];
 
-    const layout = {
+    const buildLayout = () => ({
       margin: { l: 40, r: 60, t: 10, b: 40 },
       xaxis: {
         title: 'x (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
-        range: xRange,
+        range: [...xRange],
         dtick: dtick,
         autorange: false,
-        constrainaxis: 'range',
+        fixedrange: false,
       },
       yaxis: {
         title: 'y (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
-        range: yRange,
+        range: [...yRange],
         dtick: dtick,
         autorange: false,
-        scaleanchor: 'x',
-        scaleratio: 1,
-        constrainaxis: 'range',
+        fixedrange: false,
       },
-      shapes,
-      annotations,
+      shapes: shapes.map((shape) => ({ ...shape })),
+      annotations: annotations.map((note) => ({ ...note })),
       plot_bgcolor: 'transparent',
       paper_bgcolor: 'transparent',
       dragmode: 'zoom',
-    };
-
-    const plotEl = containerRef.current;
+    });
 
     const plotConfig = {
       displayModeBar: true,
@@ -229,21 +208,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       scrollZoom: false,
     };
 
-    plotSnapshotRef.current = { data, layout, config: plotConfig };
-
-    Plotly.newPlot(plotEl, data, layout, plotConfig).then(() => {
-      clampingRef.current = true;
-      return Plotly.relayout(plotEl, {
-        'xaxis.range': xRange,
-        'yaxis.range': yRange,
-        'xaxis.autorange': false,
-        'yaxis.autorange': false,
-      });
-    }).finally(() => {
-      clampingRef.current = false;
-    });
-
-    const applyClampedRanges = (nextX, nextY) => {
+    const applyClampedRanges = (plotEl, nextX, nextY) => {
       clampingRef.current = true;
       Plotly.relayout(plotEl, {
         'xaxis.range': nextX,
@@ -255,52 +220,79 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       });
     };
 
-    const handleRelayout = (eventData) => {
-      if (clampingRef.current) return;
+    const mountPlot = (plotEl) => {
+      const layout = buildLayout();
 
-      if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
-        resetPlotView();
-        return;
-      }
+      const handleRelayout = (eventData) => {
+        if (clampingRef.current) return;
 
-      const layoutSnapshot = plotEl.layout;
-      let nextX = readAxisRange(eventData, 'xaxis');
-      let nextY = readAxisRange(eventData, 'yaxis');
+        if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
+          applyClampedRanges(plotEl, boundsRef.current.x, boundsRef.current.y);
+          setIsZoomed(false);
+          return;
+        }
 
-      if (!nextX && layoutSnapshot?.xaxis?.range) {
-        nextX = [...layoutSnapshot.xaxis.range];
-      }
-      if (!nextY && layoutSnapshot?.yaxis?.range) {
-        nextY = [...layoutSnapshot.yaxis.range];
-      }
-      if (!nextX || !nextY) return;
+        let nextX = readAxisRange(eventData, 'xaxis');
+        let nextY = readAxisRange(eventData, 'yaxis');
 
-      const clampedX = clampAxisRange(nextX, bounds.x);
-      const clampedY = clampAxisRange(nextY, bounds.y);
-      const fullXSpan = bounds.x[1] - bounds.x[0];
-      const fullYSpan = bounds.y[1] - bounds.y[0];
-      const xSpan = nextX[1] - nextX[0];
-      const ySpan = nextY[1] - nextY[0];
-      const zoomedOut = xSpan >= fullXSpan || ySpan >= fullYSpan;
+        if (!nextX && plotEl.layout?.xaxis?.range) {
+          nextX = [...plotEl.layout.xaxis.range];
+        }
+        if (!nextY && plotEl.layout?.yaxis?.range) {
+          nextY = [...plotEl.layout.yaxis.range];
+        }
+        if (!nextX || !nextY) return;
 
-      if (zoomedOut) {
-        applyClampedRanges(bounds.x, bounds.y);
+        const currentBounds = boundsRef.current;
+        const clampedX = clampAxisRange(nextX, currentBounds.x);
+        const clampedY = clampAxisRange(nextY, currentBounds.y);
+        const fullXSpan = currentBounds.x[1] - currentBounds.x[0];
+        const fullYSpan = currentBounds.y[1] - currentBounds.y[0];
+        const xSpan = nextX[1] - nextX[0];
+        const ySpan = nextY[1] - nextY[0];
+        const zoomedOut = xSpan >= fullXSpan || ySpan >= fullYSpan;
+
+        if (zoomedOut) {
+          applyClampedRanges(plotEl, currentBounds.x, currentBounds.y);
+          setIsZoomed(false);
+        } else if (!rangesNearlyEqual(clampedX, nextX) || !rangesNearlyEqual(clampedY, nextY)) {
+          applyClampedRanges(plotEl, clampedX, clampedY);
+          setIsZoomed(isZoomedIn(clampedX, clampedY, currentBounds));
+        } else {
+          setIsZoomed(isZoomedIn(clampedX, clampedY, currentBounds));
+        }
+      };
+
+      plotEl.removeAllListeners('plotly_relayout');
+      plotEl.on('plotly_relayout', handleRelayout);
+
+      return Plotly.newPlot(plotEl, data, layout, plotConfig).then(() => {
+        clampingRef.current = true;
+        return Plotly.relayout(plotEl, {
+          'xaxis.range': xRange,
+          'yaxis.range': yRange,
+          'xaxis.autorange': false,
+          'yaxis.autorange': false,
+        });
+      }).finally(() => {
+        clampingRef.current = false;
         setIsZoomed(false);
-      } else if (!rangesNearlyEqual(clampedX, nextX) || !rangesNearlyEqual(clampedY, nextY)) {
-        applyClampedRanges(clampedX, clampedY);
-        setIsZoomed(isZoomedIn(clampedX, clampedY, bounds));
-      } else {
-        setIsZoomed(isZoomedIn(clampedX, clampedY, bounds));
-      }
+      });
     };
 
-    plotEl.on('plotly_relayout', handleRelayout);
+    mountPlotRef.current = mountPlot;
+
+    if (!containerRef.current) return undefined;
+
+    const plotEl = containerRef.current;
+    mountPlot(plotEl);
 
     return () => {
+      mountPlotRef.current = null;
       plotEl.removeAllListeners('plotly_relayout');
       Plotly.purge(plotEl);
     };
-  }, [field, footprints, showOutlines, autoScale, isDark, grid]);
+  }, [field, footprints, showOutlines, autoScale, isDark, grid, min, max]);
 
   return (
     <div className="card span-12">
@@ -312,6 +304,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
           </div>
         </div>
         <button
+          type="button"
           onClick={resetPlotView}
           style={{
             padding: '6px 12px',
