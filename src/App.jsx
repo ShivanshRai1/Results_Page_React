@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './components/ThemeContext';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -118,7 +118,7 @@ function AppContent() {
     if (path.includes('temp')) return 'temp';
     if (path.includes('heatmaps')) return 'heatmaps';
     if (path.includes('checks')) return 'checks';
-    return 'checks'; // default
+    return 'heatmaps'; // default
   };
 
   const activeTab = getActiveTabFromPath();
@@ -441,13 +441,8 @@ function AppContent() {
                 </div>
               </section>
             } />
-            <Route path="*" element={
-              <section className="panel active">
-                <div className="cards">
-                  <Checks data={data} config={config.checks} />
-                </div>
-              </section>
-            } />
+            <Route path="/" element={<Navigate to="/heatmaps" replace />} />
+            <Route path="*" element={<Navigate to="/heatmaps" replace />} />
           </Routes>
         </main>
       </div>

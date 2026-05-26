@@ -3,24 +3,94 @@ import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
 import { useTheme } from './ThemeContext';
 
+const DEFAULT_BOUNDS = { x: [0, 40], y: [0, 40] };
+
+function getGridBounds(grid) {
+  if (!grid) return DEFAULT_BOUNDS;
+  return {
+    x: [grid.x_min, grid.x_max],
+    y: [grid.y_min, grid.y_max],
+  };
+}
+
+function readAxisRange(eventData, axisKey) {
+  const start = eventData[`${axisKey}.range[0]`];
+  const end = eventData[`${axisKey}.range[1]`];
+  if (start !== undefined && end !== undefined) {
+    return [Number(start), Number(end)];
+  }
+  const range = eventData[`${axisKey}.range`];
+  if (Array.isArray(range) && range.length === 2) {
+    return [Number(range[0]), Number(range[1])];
+  }
+  return null;
+}
+
+function clampAxisRange(range, bounds) {
+  const [boundMin, boundMax] = bounds;
+  let [rangeMin, rangeMax] = range;
+  if (rangeMin > rangeMax) {
+    [rangeMin, rangeMax] = [rangeMax, rangeMin];
+  }
+
+  const span = rangeMax - rangeMin;
+  const boundSpan = boundMax - boundMin;
+  if (span >= boundSpan) {
+    return [boundMin, boundMax];
+  }
+
+  if (rangeMin < boundMin) {
+    rangeMax += boundMin - rangeMin;
+    rangeMin = boundMin;
+  }
+  if (rangeMax > boundMax) {
+    rangeMin -= rangeMax - boundMax;
+    rangeMax = boundMax;
+  }
+  if (rangeMin < boundMin) {
+    rangeMin = boundMin;
+    rangeMax = Math.min(boundMax, rangeMin + span);
+  }
+
+  return [rangeMin, rangeMax];
+}
+
+function rangesNearlyEqual(a, b, tolerance = 0.01) {
+  return Math.abs(a[0] - b[0]) <= tolerance && Math.abs(a[1] - b[1]) <= tolerance;
+}
+
+function isZoomedIn(xRange, yRange, bounds) {
+  return (
+    !rangesNearlyEqual(xRange, bounds.x) ||
+    !rangesNearlyEqual(yRange, bounds.y)
+  );
+}
+
 export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale, plotId, grid }) => {
   const containerRef = useRef(null);
+  const clampingRef = useRef(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
 
   const handleReset = () => {
-    if (containerRef.current) {
-      Plotly.relayout(containerRef.current, {
-        'xaxis.autorange': true,
-        'yaxis.autorange': true,
-      });
-      setIsZoomed(false);
-    }
+    if (!containerRef.current) return;
+    const bounds = getGridBounds(grid);
+    Plotly.relayout(containerRef.current, {
+      'xaxis.range': bounds.x,
+      'yaxis.range': bounds.y,
+      'xaxis.autorange': false,
+      'yaxis.autorange': false,
+    });
+    setIsZoomed(false);
   };
 
   useEffect(() => {
     if (!containerRef.current) return;
+
+    const bounds = getGridBounds(grid);
+    const xRange = bounds.x;
+    const yRange = bounds.y;
 
     const shapes = showOutlines
       ? footprints.map((fp) => ({
@@ -71,16 +141,18 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
     const textColor = isDark ? '#ffffff' : '#000000';
 
-    const xRange = grid ? [grid.x_min, grid.x_max] : [0, 40];
-    const yRange = grid ? [grid.y_min, grid.y_max] : [0, 40];
     const xSpan = xRange[1] - xRange[0];
     const dtick = Math.max(10, Math.round(xSpan / 5));
 
     // Map each grid cell index to physical mm so shapes/annotations align
     const nx = field[0]?.length ?? 1;
     const ny = field.length ?? 1;
-    const xCoords = Array.from({ length: nx }, (_, i) => xRange[0] + (i / (nx - 1)) * (xRange[1] - xRange[0]));
-    const yCoords = Array.from({ length: ny }, (_, j) => yRange[0] + (j / (ny - 1)) * (yRange[1] - yRange[0]));
+    const xCoords = Array.from({ length: nx }, (_, i) =>
+      nx > 1 ? xRange[0] + (i / (nx - 1)) * (xRange[1] - xRange[0]) : xRange[0]
+    );
+    const yCoords = Array.from({ length: ny }, (_, j) =>
+      ny > 1 ? yRange[0] + (j / (ny - 1)) * (yRange[1] - yRange[0]) : yRange[0]
+    );
 
     const data = [
       {
@@ -105,6 +177,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         tickfont: { color: textColor },
         range: xRange,
         dtick: dtick,
+        autorange: false,
         constrainaxis: 'range',
       },
       yaxis: {
@@ -113,6 +186,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         tickfont: { color: textColor },
         range: yRange,
         dtick: dtick,
+        autorange: false,
         scaleanchor: 'x',
         scaleratio: 1,
         constrainaxis: 'range',
@@ -124,52 +198,74 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       dragmode: 'zoom',
     };
 
-    Plotly.newPlot(containerRef.current, data, layout, {
+    const plotEl = containerRef.current;
+
+    Plotly.newPlot(plotEl, data, layout, {
       displayModeBar: true,
       modeBarButtonsToRemove: ['toImage', 'sendDataToCloud', 'lasso2d', 'select2d'],
       responsive: true,
       doubleClick: 'reset',
-      scrollZoom: true,
+      scrollZoom: false,
+    }).then(() => {
+      clampingRef.current = true;
+      return Plotly.relayout(plotEl, {
+        'xaxis.range': xRange,
+        'yaxis.range': yRange,
+        'xaxis.autorange': false,
+        'yaxis.autorange': false,
+      });
+    }).finally(() => {
+      clampingRef.current = false;
     });
 
-    const handleRelayout = (eventData) => {
-      const xRange = grid ? [grid.x_min, grid.x_max] : [0, 40];
-      const yRange = grid ? [grid.y_min, grid.y_max] : [0, 40];
-      let reset = false;
-      let update = {};
-      if (
-        eventData['xaxis.range[0]'] !== undefined &&
-        (eventData['xaxis.range[0]'] < xRange[0] || eventData['xaxis.range[1]'] > xRange[1])
-      ) {
-        update['xaxis.range'] = xRange;
-        reset = true;
-      }
-      if (
-        eventData['yaxis.range[0]'] !== undefined &&
-        (eventData['yaxis.range[0]'] < yRange[0] || eventData['yaxis.range[1]'] > yRange[1])
-      ) {
-        update['yaxis.range'] = yRange;
-        reset = true;
-      }
-      if (reset && containerRef.current) {
-        Plotly.relayout(containerRef.current, update);
-      }
-      if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
-        setIsZoomed(false);
-      } else if (eventData['xaxis.range[0]'] !== undefined || eventData['yaxis.range[0]'] !== undefined) {
-        setIsZoomed(true);
-      }
+    const applyClampedRanges = (nextX, nextY) => {
+      clampingRef.current = true;
+      Plotly.relayout(plotEl, {
+        'xaxis.range': nextX,
+        'yaxis.range': nextY,
+        'xaxis.autorange': false,
+        'yaxis.autorange': false,
+      }).finally(() => {
+        clampingRef.current = false;
+      });
     };
 
-    if (containerRef.current) {
-      containerRef.current.on('plotly_relayout', handleRelayout);
-    }
+    const handleRelayout = (eventData) => {
+      if (clampingRef.current) return;
+
+      if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
+        applyClampedRanges(bounds.x, bounds.y);
+        setIsZoomed(false);
+        return;
+      }
+
+      const layoutSnapshot = plotEl.layout;
+      let nextX = readAxisRange(eventData, 'xaxis');
+      let nextY = readAxisRange(eventData, 'yaxis');
+
+      if (!nextX && layoutSnapshot?.xaxis?.range) {
+        nextX = [...layoutSnapshot.xaxis.range];
+      }
+      if (!nextY && layoutSnapshot?.yaxis?.range) {
+        nextY = [...layoutSnapshot.yaxis.range];
+      }
+      if (!nextX || !nextY) return;
+
+      const clampedX = clampAxisRange(nextX, bounds.x);
+      const clampedY = clampAxisRange(nextY, bounds.y);
+
+      if (!rangesNearlyEqual(clampedX, nextX) || !rangesNearlyEqual(clampedY, nextY)) {
+        applyClampedRanges(clampedX, clampedY);
+      }
+
+      setIsZoomed(isZoomedIn(clampedX, clampedY, bounds));
+    };
+
+    plotEl.on('plotly_relayout', handleRelayout);
 
     return () => {
-      if (containerRef.current) {
-        containerRef.current.removeAllListeners('plotly_relayout');
-        Plotly.purge(containerRef.current);
-      }
+      plotEl.removeAllListeners('plotly_relayout');
+      Plotly.purge(plotEl);
     };
   }, [field, footprints, showOutlines, autoScale, isDark, grid]);
 
