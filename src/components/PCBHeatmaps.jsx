@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
 import { useTheme } from './ThemeContext';
@@ -11,19 +11,6 @@ function getGridBounds(grid) {
     x: [grid.x_min, grid.x_max],
     y: [grid.y_min, grid.y_max],
   };
-}
-
-function readAxisRange(eventData, axisKey) {
-  const start = eventData[`${axisKey}.range[0]`];
-  const end = eventData[`${axisKey}.range[1]`];
-  if (start !== undefined && end !== undefined) {
-    return [Number(start), Number(end)];
-  }
-  const range = eventData[`${axisKey}.range`];
-  if (Array.isArray(range) && range.length === 2) {
-    return [Number(range[0]), Number(range[1])];
-  }
-  return null;
 }
 
 function clampAxisRange(range, bounds) {
@@ -55,7 +42,7 @@ function clampAxisRange(range, bounds) {
   return [rangeMin, rangeMax];
 }
 
-function rangesNearlyEqual(a, b, tolerance = 0.01) {
+function rangesNearlyEqual(a, b, tolerance = 0.05) {
   return Math.abs(a[0] - b[0]) <= tolerance && Math.abs(a[1] - b[1]) <= tolerance;
 }
 
@@ -66,54 +53,43 @@ function isZoomedIn(xRange, yRange, bounds) {
   );
 }
 
-function cloneBaselineLayout(layout, xRange, yRange) {
-  return {
-    margin: { ...layout.margin },
-    xaxis: {
-      ...layout.xaxis,
-      range: [xRange[0], xRange[1]],
-      autorange: false,
-    },
-    yaxis: {
-      ...layout.yaxis,
-      range: [yRange[0], yRange[1]],
-      autorange: false,
-      scaleanchor: 'x',
-      scaleratio: 1,
-      constrainaxis: 'range',
-    },
-    shapes: layout.shapes.map((shape) => ({ ...shape })),
-    annotations: layout.annotations.map((note) => ({ ...note })),
-    plot_bgcolor: layout.plot_bgcolor,
-    paper_bgcolor: layout.paper_bgcolor,
-    dragmode: layout.dragmode,
-  };
+async function applyAxisRanges(plotEl, xRange, yRange) {
+  await Plotly.relayout(plotEl, { 'yaxis.scaleanchor': null });
+  await Plotly.relayout(plotEl, {
+    'xaxis.range': [xRange[0], xRange[1]],
+    'yaxis.range': [yRange[0], yRange[1]],
+    'xaxis.autorange': false,
+    'yaxis.autorange': false,
+    'yaxis.scaleanchor': 'x',
+    'yaxis.scaleratio': 1,
+    'xaxis.constrainaxis': 'range',
+    'yaxis.constrainaxis': 'range',
+  });
 }
 
 export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale, plotId, grid }) => {
   const containerRef = useRef(null);
   const clampingRef = useRef(false);
   const boundsRef = useRef(getGridBounds(grid));
-  const baselineRef = useRef(null);
+  const validateRef = useRef(null);
   const relayoutHandlerRef = useRef(null);
+  const validateTimerRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
 
-  const resetPlotView = () => {
+  const resetPlotView = useCallback(() => {
     const plotEl = containerRef.current;
-    const baseline = baselineRef.current;
-    if (!plotEl || !baseline) return;
-
-    const bounds = boundsRef.current;
-    const resetLayout = cloneBaselineLayout(baseline.layout, bounds.x, bounds.y);
+    const validate = validateRef.current;
+    if (!plotEl || !plotEl.layout || !validate) return;
 
     clampingRef.current = true;
-    Plotly.react(plotEl, baseline.data, resetLayout, baseline.config).finally(() => {
-      clampingRef.current = false;
-      setIsZoomed(false);
-    });
-  };
+    applyAxisRanges(plotEl, boundsRef.current.x, boundsRef.current.y)
+      .then(() => validate(true))
+      .finally(() => {
+        clampingRef.current = false;
+      });
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return undefined;
@@ -134,7 +110,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
           y1: fp.y + fp.w,
           line: { color: 'cyan', width: 2 },
           layer: 'above',
-          fillcolor: 'rgba(0, 0, 0, 0)',
+          fillcolor: 'rgba(0,0,0,0)',
         }))
       : [];
 
@@ -204,16 +180,18 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         title: 'x (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
-        range: xRange,
+        range: [...xRange],
         dtick: dtick,
+        autorange: false,
         constrainaxis: 'range',
       },
       yaxis: {
         title: 'y (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
-        range: yRange,
+        range: [...yRange],
         dtick: dtick,
+        autorange: false,
         scaleanchor: 'x',
         scaleratio: 1,
         constrainaxis: 'range',
@@ -233,60 +211,67 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       scrollZoom: false,
     };
 
-    baselineRef.current = {
-      data,
-      layout: cloneBaselineLayout(layout, xRange, yRange),
-      config: plotConfig,
-    };
-
     const plotEl = containerRef.current;
 
-    const applyFullBounds = () => {
-      resetPlotView();
+    const validateRanges = async (forceFullReset = false) => {
+      if (clampingRef.current || !plotEl.layout?.xaxis?.range || !plotEl.layout?.yaxis?.range) {
+        return;
+      }
+
+      const currentBounds = boundsRef.current;
+      const xR = [...plotEl.layout.xaxis.range];
+      const yR = [...plotEl.layout.yaxis.range];
+      const fullXSpan = currentBounds.x[1] - currentBounds.x[0];
+      const fullYSpan = currentBounds.y[1] - currentBounds.y[0];
+      const xSpan = xR[1] - xR[0];
+      const ySpan = yR[1] - yR[0];
+
+      const zoomedOut = xSpan >= fullXSpan - 0.05 || ySpan >= fullYSpan - 0.05;
+      const clampedX = clampAxisRange(xR, currentBounds.x);
+      const clampedY = clampAxisRange(yR, currentBounds.y);
+      const needsFullReset = forceFullReset || zoomedOut;
+      const targetX = needsFullReset ? currentBounds.x : clampedX;
+      const targetY = needsFullReset ? currentBounds.y : clampedY;
+
+      if (!rangesNearlyEqual(xR, targetX) || !rangesNearlyEqual(yR, targetY)) {
+        clampingRef.current = true;
+        try {
+          await applyAxisRanges(plotEl, targetX, targetY);
+        } finally {
+          clampingRef.current = false;
+        }
+        setIsZoomed(false);
+        return;
+      }
+
+      setIsZoomed(isZoomedIn(xR, yR, currentBounds));
+    };
+
+    validateRef.current = validateRanges;
+
+    const scheduleValidate = (forceFullReset = false) => {
+      clearTimeout(validateTimerRef.current);
+      validateTimerRef.current = setTimeout(() => {
+        validateRanges(forceFullReset);
+      }, 0);
     };
 
     const handleRelayout = (eventData) => {
       if (clampingRef.current) return;
 
       if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
-        applyFullBounds();
+        scheduleValidate(true);
         return;
       }
 
-      let nextX = readAxisRange(eventData, 'xaxis');
-      let nextY = readAxisRange(eventData, 'yaxis');
-
-      if (!nextX && plotEl.layout?.xaxis?.range) {
-        nextX = [...plotEl.layout.xaxis.range];
+      if (
+        eventData['xaxis.range[0]'] !== undefined ||
+        eventData['yaxis.range[0]'] !== undefined ||
+        eventData['xaxis.range'] !== undefined ||
+        eventData['yaxis.range'] !== undefined
+      ) {
+        scheduleValidate(false);
       }
-      if (!nextY && plotEl.layout?.yaxis?.range) {
-        nextY = [...plotEl.layout.yaxis.range];
-      }
-      if (!nextX || !nextY) {
-        if (eventData['xaxis.range[0]'] !== undefined || eventData['yaxis.range[0]'] !== undefined) {
-          setIsZoomed(true);
-        }
-        return;
-      }
-
-      const currentBounds = boundsRef.current;
-      const fullXSpan = currentBounds.x[1] - currentBounds.x[0];
-      const fullYSpan = currentBounds.y[1] - currentBounds.y[0];
-      const xOutOfBounds =
-        nextX[0] < currentBounds.x[0] ||
-        nextX[1] > currentBounds.x[1] ||
-        (nextX[1] - nextX[0]) >= fullXSpan;
-      const yOutOfBounds =
-        nextY[0] < currentBounds.y[0] ||
-        nextY[1] > currentBounds.y[1] ||
-        (nextY[1] - nextY[0]) >= fullYSpan;
-
-      if (xOutOfBounds || yOutOfBounds) {
-        applyFullBounds();
-        return;
-      }
-
-      setIsZoomed(isZoomedIn(nextX, nextY, currentBounds));
     };
 
     relayoutHandlerRef.current = handleRelayout;
@@ -295,12 +280,18 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       if (typeof plotEl.on === 'function') {
         plotEl.on('plotly_relayout', handleRelayout);
       }
+      clampingRef.current = true;
+      return applyAxisRanges(plotEl, xRange, yRange);
+    }).finally(() => {
+      clampingRef.current = false;
+      setIsZoomed(false);
     });
 
     return () => {
+      clearTimeout(validateTimerRef.current);
+      validateRef.current = null;
       const handler = relayoutHandlerRef.current;
       relayoutHandlerRef.current = null;
-      baselineRef.current = null;
       if (typeof plotEl.removeAllListeners === 'function') {
         plotEl.removeAllListeners('plotly_relayout');
       } else if (typeof plotEl.removeListener === 'function' && handler) {
