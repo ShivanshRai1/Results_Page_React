@@ -3,27 +3,27 @@ import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
 import { useTheme } from './ThemeContext';
 
-const MAX_PLOT_HEIGHT = 580;
-
-function getPlotAspect(grid) {
-  const bounds = getGridBounds(grid);
-  const xSpan = Math.max(1, bounds.x[1] - bounds.x[0]);
-  const ySpan = Math.max(1, bounds.y[1] - bounds.y[0]);
-  return { xSpan, ySpan };
-}
+const MAX_PLOT_HEIGHT = 680;
 
 function getMaxPlotHeight() {
   if (typeof window === 'undefined') return MAX_PLOT_HEIGHT;
-  return Math.min(MAX_PLOT_HEIGHT, Math.round(window.innerHeight * 0.54));
+  return Math.min(MAX_PLOT_HEIGHT, Math.round(window.innerHeight * 0.58));
 }
 
 function computePlotDimensions(availableWidth, xSpan, ySpan) {
   const maxH = getMaxPlotHeight();
   const aspect = xSpan / ySpan;
   const widthAtMaxH = maxH * aspect;
-  const width = Math.min(Math.max(availableWidth, 280), widthAtMaxH);
+  const width = Math.min(Math.max(availableWidth, 240), widthAtMaxH);
   const height = Math.round(width / aspect);
   return { width: Math.round(width), height };
+}
+
+function getPlotAspect(grid) {
+  const bounds = getGridBounds(grid);
+  const xSpan = Math.max(1, bounds.x[1] - bounds.x[0]);
+  const ySpan = Math.max(1, bounds.y[1] - bounds.y[0]);
+  return { xSpan, ySpan };
 }
 
 function getGridBounds(grid) {
@@ -107,24 +107,24 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
   useEffect(() => {
     const updatePlotSize = () => {
-      const gridWidth = cardRef.current?.parentElement?.clientWidth;
-      if (!gridWidth) return;
-      const availableWidth = gridWidth - 28;
+      const card = cardRef.current;
+      if (!card) return;
+      const availableWidth = card.clientWidth - 28;
       setPlotSize(computePlotDimensions(availableWidth, xSpan, ySpan));
     };
 
     updatePlotSize();
     window.addEventListener('resize', updatePlotSize);
 
-    const gridEl = cardRef.current?.parentElement;
-    const gridObserver = gridEl && typeof ResizeObserver !== 'undefined'
+    const cardEl = cardRef.current;
+    const cardObserver = cardEl && typeof ResizeObserver !== 'undefined'
       ? new ResizeObserver(updatePlotSize)
       : null;
-    gridObserver?.observe(gridEl);
+    cardObserver?.observe(cardEl);
 
     return () => {
       window.removeEventListener('resize', updatePlotSize);
-      gridObserver?.disconnect();
+      cardObserver?.disconnect();
     };
   }, [xSpan, ySpan]);
 
@@ -393,11 +393,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
   }, [field, footprints, showOutlines, autoScale, isDark, grid, min, max]);
 
   return (
-    <div
-      ref={cardRef}
-      className="card span-12 heatmap-card"
-      style={{ width: 'fit-content', maxWidth: '100%', justifySelf: 'center' }}
-    >
+    <div ref={cardRef} className="card heatmap-card">
       <div className="card-header">
         <div>
           <h2>{title}</h2>
@@ -434,7 +430,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         ref={containerRef}
         id={plotId}
         style={{
-          width: plotSize.width,
+          width: '100%',
           height: plotSize.height,
           position: 'relative',
         }}

@@ -360,6 +360,33 @@ main {
   grid-column: span 12;
 }
 
+.heatmap-grid {
+  grid-column: span 12;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.heatmap-card {
+  width: 100%;
+  min-width: 0;
+  grid-column: auto;
+}
+
+.heatmap-card h2 {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.heatmap-card .card-header {
+  align-items: flex-start;
+}
+
+.heatmap-card .card-header button {
+  flex-shrink: 0;
+}
+
 /* Accordion */
 .accordion {
   border: 1px solid var(--border);
@@ -526,6 +553,9 @@ code.inline {
 @media (max-width: 1200px) {
   .span-4, .span-6, .span-8 {
     grid-column: span 12;
+  }
+  .heatmap-grid {
+    grid-template-columns: 1fr;
   }
   .layout {
     grid-template-columns: 1fr;

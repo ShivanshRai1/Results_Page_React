@@ -404,6 +404,7 @@ function AppContent() {
                       </label>
                     </div>
                   </div>
+                  <div className="heatmap-grid">
                   <PCBHeatmaps
                     title="Top Surface Heatmap"
                     field={data.fields.top}
@@ -431,6 +432,7 @@ function AppContent() {
                     plotId="heatmapAvg"
                     grid={data.grid}
                   />
+                  </div>
                 </div>
               </section>
             } />
