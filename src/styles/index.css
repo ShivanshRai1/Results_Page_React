@@ -387,6 +387,10 @@ main {
   flex-shrink: 0;
 }
 
+.heatmap-card .modebar {
+  transform: translateY(-10px);
+}
+
 /* Accordion */
 .accordion {
   border: 1px solid var(--border);
