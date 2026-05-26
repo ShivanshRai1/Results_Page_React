@@ -66,19 +66,35 @@ function isZoomedIn(xRange, yRange, bounds) {
   );
 }
 
-function applyAxisRanges(plotEl, xRange, yRange) {
-  return Plotly.relayout(plotEl, {
-    'xaxis.range': [xRange[0], xRange[1]],
-    'yaxis.range': [yRange[0], yRange[1]],
-    'xaxis.autorange': false,
-    'yaxis.autorange': false,
-  });
+function cloneBaselineLayout(layout, xRange, yRange) {
+  return {
+    margin: { ...layout.margin },
+    xaxis: {
+      ...layout.xaxis,
+      range: [xRange[0], xRange[1]],
+      autorange: false,
+    },
+    yaxis: {
+      ...layout.yaxis,
+      range: [yRange[0], yRange[1]],
+      autorange: false,
+      scaleanchor: 'x',
+      scaleratio: 1,
+      constrainaxis: 'range',
+    },
+    shapes: layout.shapes.map((shape) => ({ ...shape })),
+    annotations: layout.annotations.map((note) => ({ ...note })),
+    plot_bgcolor: layout.plot_bgcolor,
+    paper_bgcolor: layout.paper_bgcolor,
+    dragmode: layout.dragmode,
+  };
 }
 
 export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale, plotId, grid }) => {
   const containerRef = useRef(null);
   const clampingRef = useRef(false);
   const boundsRef = useRef(getGridBounds(grid));
+  const baselineRef = useRef(null);
   const relayoutHandlerRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
@@ -86,11 +102,14 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
   const resetPlotView = () => {
     const plotEl = containerRef.current;
-    if (!plotEl || !plotEl.layout) return;
+    const baseline = baselineRef.current;
+    if (!plotEl || !baseline) return;
 
     const bounds = boundsRef.current;
+    const resetLayout = cloneBaselineLayout(baseline.layout, bounds.x, bounds.y);
+
     clampingRef.current = true;
-    applyAxisRanges(plotEl, bounds.x, bounds.y).finally(() => {
+    Plotly.react(plotEl, baseline.data, resetLayout, baseline.config).finally(() => {
       clampingRef.current = false;
       setIsZoomed(false);
     });
@@ -115,7 +134,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
           y1: fp.y + fp.w,
           line: { color: 'cyan', width: 2 },
           layer: 'above',
-          fillcolor: 'rgba(0,0,0,0)',
+          fillcolor: 'rgba(0, 0, 0, 0)',
         }))
       : [];
 
@@ -158,10 +177,10 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
     const nx = field[0]?.length ?? 1;
     const ny = field.length ?? 1;
     const xCoords = Array.from({ length: nx }, (_, i) =>
-      nx > 1 ? xRange[0] + (i / (nx - 1)) * (xRange[1] - xRange[0]) : xRange[0]
+      xRange[0] + (i / (nx - 1)) * (xRange[1] - xRange[0])
     );
     const yCoords = Array.from({ length: ny }, (_, j) =>
-      ny > 1 ? yRange[0] + (j / (ny - 1)) * (yRange[1] - yRange[0]) : yRange[0]
+      yRange[0] + (j / (ny - 1)) * (yRange[1] - yRange[0])
     );
 
     const data = [
@@ -185,17 +204,19 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         title: 'x (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
-        range: [...xRange],
+        range: xRange,
         dtick: dtick,
-        autorange: false,
+        constrainaxis: 'range',
       },
       yaxis: {
         title: 'y (mm)',
         titlefont: { color: textColor },
         tickfont: { color: textColor },
-        range: [...yRange],
+        range: yRange,
         dtick: dtick,
-        autorange: false,
+        scaleanchor: 'x',
+        scaleratio: 1,
+        constrainaxis: 'range',
       },
       shapes,
       annotations,
@@ -212,17 +233,23 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       scrollZoom: false,
     };
 
+    baselineRef.current = {
+      data,
+      layout: cloneBaselineLayout(layout, xRange, yRange),
+      config: plotConfig,
+    };
+
     const plotEl = containerRef.current;
+
+    const applyFullBounds = () => {
+      resetPlotView();
+    };
 
     const handleRelayout = (eventData) => {
       if (clampingRef.current) return;
 
       if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
-        clampingRef.current = true;
-        applyAxisRanges(plotEl, boundsRef.current.x, boundsRef.current.y).finally(() => {
-          clampingRef.current = false;
-          setIsZoomed(false);
-        });
+        applyFullBounds();
         return;
       }
 
@@ -235,34 +262,31 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       if (!nextY && plotEl.layout?.yaxis?.range) {
         nextY = [...plotEl.layout.yaxis.range];
       }
-      if (!nextX || !nextY) return;
+      if (!nextX || !nextY) {
+        if (eventData['xaxis.range[0]'] !== undefined || eventData['yaxis.range[0]'] !== undefined) {
+          setIsZoomed(true);
+        }
+        return;
+      }
 
       const currentBounds = boundsRef.current;
-      const clampedX = clampAxisRange(nextX, currentBounds.x);
-      const clampedY = clampAxisRange(nextY, currentBounds.y);
       const fullXSpan = currentBounds.x[1] - currentBounds.x[0];
       const fullYSpan = currentBounds.y[1] - currentBounds.y[0];
-      const zoomedOut = (nextX[1] - nextX[0]) >= fullXSpan || (nextY[1] - nextY[0]) >= fullYSpan;
+      const xOutOfBounds =
+        nextX[0] < currentBounds.x[0] ||
+        nextX[1] > currentBounds.x[1] ||
+        (nextX[1] - nextX[0]) >= fullXSpan;
+      const yOutOfBounds =
+        nextY[0] < currentBounds.y[0] ||
+        nextY[1] > currentBounds.y[1] ||
+        (nextY[1] - nextY[0]) >= fullYSpan;
 
-      if (zoomedOut) {
-        clampingRef.current = true;
-        applyAxisRanges(plotEl, currentBounds.x, currentBounds.y).finally(() => {
-          clampingRef.current = false;
-          setIsZoomed(false);
-        });
+      if (xOutOfBounds || yOutOfBounds) {
+        applyFullBounds();
         return;
       }
 
-      if (!rangesNearlyEqual(clampedX, nextX) || !rangesNearlyEqual(clampedY, nextY)) {
-        clampingRef.current = true;
-        applyAxisRanges(plotEl, clampedX, clampedY).finally(() => {
-          clampingRef.current = false;
-          setIsZoomed(isZoomedIn(clampedX, clampedY, currentBounds));
-        });
-        return;
-      }
-
-      setIsZoomed(isZoomedIn(clampedX, clampedY, currentBounds));
+      setIsZoomed(isZoomedIn(nextX, nextY, currentBounds));
     };
 
     relayoutHandlerRef.current = handleRelayout;
@@ -271,17 +295,15 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       if (typeof plotEl.on === 'function') {
         plotEl.on('plotly_relayout', handleRelayout);
       }
-      clampingRef.current = true;
-      return applyAxisRanges(plotEl, xRange, yRange);
-    }).finally(() => {
-      clampingRef.current = false;
-      setIsZoomed(false);
     });
 
     return () => {
       const handler = relayoutHandlerRef.current;
       relayoutHandlerRef.current = null;
-      if (typeof plotEl.removeListener === 'function' && handler) {
+      baselineRef.current = null;
+      if (typeof plotEl.removeAllListeners === 'function') {
+        plotEl.removeAllListeners('plotly_relayout');
+      } else if (typeof plotEl.removeListener === 'function' && handler) {
         plotEl.removeListener('plotly_relayout', handler);
       }
       Plotly.purge(plotEl);
