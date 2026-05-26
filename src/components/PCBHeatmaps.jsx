@@ -66,36 +66,43 @@ function isZoomedIn(xRange, yRange, bounds) {
   );
 }
 
+function applyAxisRanges(plotEl, xRange, yRange) {
+  return Plotly.relayout(plotEl, {
+    'xaxis.range': [xRange[0], xRange[1]],
+    'yaxis.range': [yRange[0], yRange[1]],
+    'xaxis.autorange': false,
+    'yaxis.autorange': false,
+  });
+}
+
 export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale, plotId, grid }) => {
   const containerRef = useRef(null);
   const clampingRef = useRef(false);
   const boundsRef = useRef(getGridBounds(grid));
-  const mountPlotRef = useRef(null);
+  const relayoutHandlerRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
 
   const resetPlotView = () => {
     const plotEl = containerRef.current;
-    const mountPlot = mountPlotRef.current;
-    if (!plotEl || !mountPlot) return;
+    if (!plotEl || !plotEl.layout) return;
 
+    const bounds = boundsRef.current;
     clampingRef.current = true;
-    plotEl.removeAllListeners('plotly_relayout');
-    Plotly.purge(plotEl);
-
-    mountPlot(plotEl)
-      .finally(() => {
-        clampingRef.current = false;
-        setIsZoomed(false);
-      });
+    applyAxisRanges(plotEl, bounds.x, bounds.y).finally(() => {
+      clampingRef.current = false;
+      setIsZoomed(false);
+    });
   };
 
   useEffect(() => {
+    if (!containerRef.current) return undefined;
+
     const bounds = getGridBounds(grid);
     boundsRef.current = bounds;
-    const xRange = [...bounds.x];
-    const yRange = [...bounds.y];
+    const xRange = bounds.x;
+    const yRange = bounds.y;
 
     const shapes = showOutlines
       ? footprints.map((fp) => ({
@@ -145,7 +152,6 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
     ];
 
     const textColor = isDark ? '#ffffff' : '#000000';
-
     const xSpan = xRange[1] - xRange[0];
     const dtick = Math.max(10, Math.round(xSpan / 5));
 
@@ -173,7 +179,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       },
     ];
 
-    const buildLayout = () => ({
+    const layout = {
       margin: { l: 40, r: 60, t: 10, b: 40 },
       xaxis: {
         title: 'x (mm)',
@@ -182,7 +188,6 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         range: [...xRange],
         dtick: dtick,
         autorange: false,
-        fixedrange: false,
       },
       yaxis: {
         title: 'y (mm)',
@@ -191,14 +196,13 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
         range: [...yRange],
         dtick: dtick,
         autorange: false,
-        fixedrange: false,
       },
-      shapes: shapes.map((shape) => ({ ...shape })),
-      annotations: annotations.map((note) => ({ ...note })),
+      shapes,
+      annotations,
       plot_bgcolor: 'transparent',
       paper_bgcolor: 'transparent',
       dragmode: 'zoom',
-    });
+    };
 
     const plotConfig = {
       displayModeBar: true,
@@ -208,88 +212,78 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       scrollZoom: false,
     };
 
-    const applyClampedRanges = (plotEl, nextX, nextY) => {
-      clampingRef.current = true;
-      Plotly.relayout(plotEl, {
-        'xaxis.range': nextX,
-        'yaxis.range': nextY,
-        'xaxis.autorange': false,
-        'yaxis.autorange': false,
-      }).finally(() => {
-        clampingRef.current = false;
-      });
-    };
-
-    const mountPlot = (plotEl) => {
-      const layout = buildLayout();
-
-      const handleRelayout = (eventData) => {
-        if (clampingRef.current) return;
-
-        if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
-          applyClampedRanges(plotEl, boundsRef.current.x, boundsRef.current.y);
-          setIsZoomed(false);
-          return;
-        }
-
-        let nextX = readAxisRange(eventData, 'xaxis');
-        let nextY = readAxisRange(eventData, 'yaxis');
-
-        if (!nextX && plotEl.layout?.xaxis?.range) {
-          nextX = [...plotEl.layout.xaxis.range];
-        }
-        if (!nextY && plotEl.layout?.yaxis?.range) {
-          nextY = [...plotEl.layout.yaxis.range];
-        }
-        if (!nextX || !nextY) return;
-
-        const currentBounds = boundsRef.current;
-        const clampedX = clampAxisRange(nextX, currentBounds.x);
-        const clampedY = clampAxisRange(nextY, currentBounds.y);
-        const fullXSpan = currentBounds.x[1] - currentBounds.x[0];
-        const fullYSpan = currentBounds.y[1] - currentBounds.y[0];
-        const xSpan = nextX[1] - nextX[0];
-        const ySpan = nextY[1] - nextY[0];
-        const zoomedOut = xSpan >= fullXSpan || ySpan >= fullYSpan;
-
-        if (zoomedOut) {
-          applyClampedRanges(plotEl, currentBounds.x, currentBounds.y);
-          setIsZoomed(false);
-        } else if (!rangesNearlyEqual(clampedX, nextX) || !rangesNearlyEqual(clampedY, nextY)) {
-          applyClampedRanges(plotEl, clampedX, clampedY);
-          setIsZoomed(isZoomedIn(clampedX, clampedY, currentBounds));
-        } else {
-          setIsZoomed(isZoomedIn(clampedX, clampedY, currentBounds));
-        }
-      };
-
-      plotEl.removeAllListeners('plotly_relayout');
-      plotEl.on('plotly_relayout', handleRelayout);
-
-      return Plotly.newPlot(plotEl, data, layout, plotConfig).then(() => {
-        clampingRef.current = true;
-        return Plotly.relayout(plotEl, {
-          'xaxis.range': xRange,
-          'yaxis.range': yRange,
-          'xaxis.autorange': false,
-          'yaxis.autorange': false,
-        });
-      }).finally(() => {
-        clampingRef.current = false;
-        setIsZoomed(false);
-      });
-    };
-
-    mountPlotRef.current = mountPlot;
-
-    if (!containerRef.current) return undefined;
-
     const plotEl = containerRef.current;
-    mountPlot(plotEl);
+
+    const handleRelayout = (eventData) => {
+      if (clampingRef.current) return;
+
+      if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
+        clampingRef.current = true;
+        applyAxisRanges(plotEl, boundsRef.current.x, boundsRef.current.y).finally(() => {
+          clampingRef.current = false;
+          setIsZoomed(false);
+        });
+        return;
+      }
+
+      let nextX = readAxisRange(eventData, 'xaxis');
+      let nextY = readAxisRange(eventData, 'yaxis');
+
+      if (!nextX && plotEl.layout?.xaxis?.range) {
+        nextX = [...plotEl.layout.xaxis.range];
+      }
+      if (!nextY && plotEl.layout?.yaxis?.range) {
+        nextY = [...plotEl.layout.yaxis.range];
+      }
+      if (!nextX || !nextY) return;
+
+      const currentBounds = boundsRef.current;
+      const clampedX = clampAxisRange(nextX, currentBounds.x);
+      const clampedY = clampAxisRange(nextY, currentBounds.y);
+      const fullXSpan = currentBounds.x[1] - currentBounds.x[0];
+      const fullYSpan = currentBounds.y[1] - currentBounds.y[0];
+      const zoomedOut = (nextX[1] - nextX[0]) >= fullXSpan || (nextY[1] - nextY[0]) >= fullYSpan;
+
+      if (zoomedOut) {
+        clampingRef.current = true;
+        applyAxisRanges(plotEl, currentBounds.x, currentBounds.y).finally(() => {
+          clampingRef.current = false;
+          setIsZoomed(false);
+        });
+        return;
+      }
+
+      if (!rangesNearlyEqual(clampedX, nextX) || !rangesNearlyEqual(clampedY, nextY)) {
+        clampingRef.current = true;
+        applyAxisRanges(plotEl, clampedX, clampedY).finally(() => {
+          clampingRef.current = false;
+          setIsZoomed(isZoomedIn(clampedX, clampedY, currentBounds));
+        });
+        return;
+      }
+
+      setIsZoomed(isZoomedIn(clampedX, clampedY, currentBounds));
+    };
+
+    relayoutHandlerRef.current = handleRelayout;
+
+    Plotly.newPlot(plotEl, data, layout, plotConfig).then(() => {
+      if (typeof plotEl.on === 'function') {
+        plotEl.on('plotly_relayout', handleRelayout);
+      }
+      clampingRef.current = true;
+      return applyAxisRanges(plotEl, xRange, yRange);
+    }).finally(() => {
+      clampingRef.current = false;
+      setIsZoomed(false);
+    });
 
     return () => {
-      mountPlotRef.current = null;
-      plotEl.removeAllListeners('plotly_relayout');
+      const handler = relayoutHandlerRef.current;
+      relayoutHandlerRef.current = null;
+      if (typeof plotEl.removeListener === 'function' && handler) {
+        plotEl.removeListener('plotly_relayout', handler);
+      }
       Plotly.purge(plotEl);
     };
   }, [field, footprints, showOutlines, autoScale, isDark, grid, min, max]);
