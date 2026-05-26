@@ -3,7 +3,7 @@ import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
 import { useTheme } from './ThemeContext';
 
-const MAX_PLOT_HEIGHT = 460;
+const MAX_PLOT_HEIGHT = 580;
 
 function getPlotAspect(grid) {
   const bounds = getGridBounds(grid);
@@ -14,7 +14,16 @@ function getPlotAspect(grid) {
 
 function getMaxPlotHeight() {
   if (typeof window === 'undefined') return MAX_PLOT_HEIGHT;
-  return Math.min(MAX_PLOT_HEIGHT, Math.round(window.innerHeight * 0.52));
+  return Math.min(MAX_PLOT_HEIGHT, Math.round(window.innerHeight * 0.54));
+}
+
+function computePlotDimensions(availableWidth, xSpan, ySpan) {
+  const maxH = getMaxPlotHeight();
+  const aspect = xSpan / ySpan;
+  const widthAtMaxH = maxH * aspect;
+  const width = Math.min(Math.max(availableWidth, 280), widthAtMaxH);
+  const height = Math.round(width / aspect);
+  return { width: Math.round(width), height };
 }
 
 function getGridBounds(grid) {
@@ -80,6 +89,7 @@ async function applyAxisRanges(plotEl, xRange, yRange) {
 }
 
 export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale, plotId, grid }) => {
+  const cardRef = useRef(null);
   const containerRef = useRef(null);
   const clampingRef = useRef(false);
   const boundsRef = useRef(getGridBounds(grid));
@@ -88,18 +98,53 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
   const validateTimerRef = useRef(null);
   const resizeTimerRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
-  const [plotHeight, setPlotHeight] = useState(getMaxPlotHeight);
+  const { xSpan, ySpan } = getPlotAspect(grid);
+  const [plotSize, setPlotSize] = useState(() =>
+    computePlotDimensions(480, xSpan, ySpan)
+  );
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
-  const { xSpan, ySpan } = getPlotAspect(grid);
-  const plotWidth = Math.round(plotHeight * (xSpan / ySpan));
 
   useEffect(() => {
-    const syncPlotHeight = () => setPlotHeight(getMaxPlotHeight());
-    syncPlotHeight();
-    window.addEventListener('resize', syncPlotHeight);
-    return () => window.removeEventListener('resize', syncPlotHeight);
-  }, []);
+    const updatePlotSize = () => {
+      const gridWidth = cardRef.current?.parentElement?.clientWidth;
+      if (!gridWidth) return;
+      const availableWidth = gridWidth - 28;
+      setPlotSize(computePlotDimensions(availableWidth, xSpan, ySpan));
+    };
+
+    updatePlotSize();
+    window.addEventListener('resize', updatePlotSize);
+
+    const gridEl = cardRef.current?.parentElement;
+    const gridObserver = gridEl && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updatePlotSize)
+      : null;
+    gridObserver?.observe(gridEl);
+
+    return () => {
+      window.removeEventListener('resize', updatePlotSize);
+      gridObserver?.disconnect();
+    };
+  }, [xSpan, ySpan]);
+
+  useEffect(() => {
+    const plotEl = containerRef.current;
+    if (!plotEl?.layout) return undefined;
+
+    clearTimeout(resizeTimerRef.current);
+    resizeTimerRef.current = setTimeout(async () => {
+      clampingRef.current = true;
+      try {
+        await Plotly.Plots.resize(plotEl);
+        await applyAxisRanges(plotEl, boundsRef.current.x, boundsRef.current.y);
+      } finally {
+        clampingRef.current = false;
+      }
+    }, 80);
+
+    return () => clearTimeout(resizeTimerRef.current);
+  }, [plotSize.width, plotSize.height]);
 
   const resetPlotView = useCallback(() => {
     const plotEl = containerRef.current;
@@ -348,7 +393,11 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
   }, [field, footprints, showOutlines, autoScale, isDark, grid, min, max]);
 
   return (
-    <div className="card span-12">
+    <div
+      ref={cardRef}
+      className="card span-12 heatmap-card"
+      style={{ width: 'fit-content', maxWidth: '100%', justifySelf: 'center' }}
+    >
       <div className="card-header">
         <div>
           <h2>{title}</h2>
@@ -381,17 +430,15 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
           Reset
         </button>
       </div>
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-        <div
-          ref={containerRef}
-          id={plotId}
-          style={{
-            width: `min(100%, ${plotWidth}px)`,
-            height: plotHeight,
-            position: 'relative',
-          }}
-        />
-      </div>
+      <div
+        ref={containerRef}
+        id={plotId}
+        style={{
+          width: plotSize.width,
+          height: plotSize.height,
+          position: 'relative',
+        }}
+      />
       {isZoomed && (
         <div
           style={{
