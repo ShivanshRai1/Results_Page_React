@@ -3,13 +3,18 @@ import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
 import { useTheme } from './ThemeContext';
 
-const MIN_PLOT_HEIGHT = 320;
+const MAX_PLOT_HEIGHT = 460;
 
 function getPlotAspect(grid) {
   const bounds = getGridBounds(grid);
   const xSpan = Math.max(1, bounds.x[1] - bounds.x[0]);
   const ySpan = Math.max(1, bounds.y[1] - bounds.y[0]);
   return { xSpan, ySpan };
+}
+
+function getMaxPlotHeight() {
+  if (typeof window === 'undefined') return MAX_PLOT_HEIGHT;
+  return Math.min(MAX_PLOT_HEIGHT, Math.round(window.innerHeight * 0.52));
 }
 
 function getGridBounds(grid) {
@@ -83,9 +88,18 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
   const validateTimerRef = useRef(null);
   const resizeTimerRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [plotHeight, setPlotHeight] = useState(getMaxPlotHeight);
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
   const { xSpan, ySpan } = getPlotAspect(grid);
+  const plotWidth = Math.round(plotHeight * (xSpan / ySpan));
+
+  useEffect(() => {
+    const syncPlotHeight = () => setPlotHeight(getMaxPlotHeight());
+    syncPlotHeight();
+    window.addEventListener('resize', syncPlotHeight);
+    return () => window.removeEventListener('resize', syncPlotHeight);
+  }, []);
 
   const resetPlotView = useCallback(() => {
     const plotEl = containerRef.current;
@@ -367,16 +381,17 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
           Reset
         </button>
       </div>
-      <div
-        ref={containerRef}
-        id={plotId}
-        style={{
-          width: '100%',
-          aspectRatio: `${xSpan} / ${ySpan}`,
-          minHeight: MIN_PLOT_HEIGHT,
-          position: 'relative',
-        }}
-      />
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+        <div
+          ref={containerRef}
+          id={plotId}
+          style={{
+            width: `min(100%, ${plotWidth}px)`,
+            height: plotHeight,
+            position: 'relative',
+          }}
+        />
+      </div>
       {isZoomed && (
         <div
           style={{
