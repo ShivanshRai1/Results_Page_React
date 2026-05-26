@@ -3,14 +3,13 @@ import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
 import { useTheme } from './ThemeContext';
 
-const MAX_PLOT_HEIGHT = 360;
+const MIN_PLOT_HEIGHT = 320;
 
-function getPlotFrameSize(grid) {
+function getPlotAspect(grid) {
   const bounds = getGridBounds(grid);
   const xSpan = Math.max(1, bounds.x[1] - bounds.x[0]);
   const ySpan = Math.max(1, bounds.y[1] - bounds.y[0]);
-  const maxPlotWidth = Math.round(MAX_PLOT_HEIGHT * (xSpan / ySpan));
-  return { bounds, xSpan, ySpan, maxPlotWidth };
+  return { xSpan, ySpan };
 }
 
 function getGridBounds(grid) {
@@ -86,7 +85,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
-  const { xSpan, ySpan, maxPlotWidth } = getPlotFrameSize(grid);
+  const { xSpan, ySpan } = getPlotAspect(grid);
 
   const resetPlotView = useCallback(() => {
     const plotEl = containerRef.current;
@@ -368,18 +367,16 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
           Reset
         </button>
       </div>
-      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-        <div
-          ref={containerRef}
-          id={plotId}
-          style={{
-            width: `min(100%, ${maxPlotWidth}px)`,
-            aspectRatio: `${xSpan} / ${ySpan}`,
-            maxHeight: MAX_PLOT_HEIGHT,
-            position: 'relative',
-          }}
-        />
-      </div>
+      <div
+        ref={containerRef}
+        id={plotId}
+        style={{
+          width: '100%',
+          aspectRatio: `${xSpan} / ${ySpan}`,
+          minHeight: MIN_PLOT_HEIGHT,
+          position: 'relative',
+        }}
+      />
       {isZoomed && (
         <div
           style={{
