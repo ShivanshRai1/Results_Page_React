@@ -3,10 +3,18 @@ import Plotly from 'plotly.js-dist-min';
 import { minMax2D, fmt } from '../utils/helpers';
 import { useTheme } from './ThemeContext';
 
-const DEFAULT_BOUNDS = { x: [0, 40], y: [0, 40] };
+const MAX_PLOT_HEIGHT = 360;
+
+function getPlotFrameSize(grid) {
+  const bounds = getGridBounds(grid);
+  const xSpan = Math.max(1, bounds.x[1] - bounds.x[0]);
+  const ySpan = Math.max(1, bounds.y[1] - bounds.y[0]);
+  const maxPlotWidth = Math.round(MAX_PLOT_HEIGHT * (xSpan / ySpan));
+  return { bounds, xSpan, ySpan, maxPlotWidth };
+}
 
 function getGridBounds(grid) {
-  if (!grid) return DEFAULT_BOUNDS;
+  if (!grid) return { x: [0, 40], y: [0, 40] };
   return {
     x: [grid.x_min, grid.x_max],
     y: [grid.y_min, grid.y_max],
@@ -74,9 +82,11 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
   const validateRef = useRef(null);
   const relayoutHandlerRef = useRef(null);
   const validateTimerRef = useRef(null);
+  const resizeTimerRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
+  const { xSpan, ySpan, maxPlotWidth } = getPlotFrameSize(grid);
 
   const resetPlotView = useCallback(() => {
     const plotEl = containerRef.current;
@@ -152,11 +162,13 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
     const nx = field[0]?.length ?? 1;
     const ny = field.length ?? 1;
+    const xDenom = Math.max(1, nx - 1);
+    const yDenom = Math.max(1, ny - 1);
     const xCoords = Array.from({ length: nx }, (_, i) =>
-      xRange[0] + (i / (nx - 1)) * (xRange[1] - xRange[0])
+      xRange[0] + (i / xDenom) * (xRange[1] - xRange[0])
     );
     const yCoords = Array.from({ length: ny }, (_, j) =>
-      yRange[0] + (j / (ny - 1)) * (yRange[1] - yRange[0])
+      yRange[0] + (j / yDenom) * (yRange[1] - yRange[0])
     );
 
     const data = [
@@ -276,19 +288,40 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
     relayoutHandlerRef.current = handleRelayout;
 
-    Plotly.newPlot(plotEl, data, layout, plotConfig).then(() => {
+    Plotly.newPlot(plotEl, data, layout, plotConfig).then(async () => {
       if (typeof plotEl.on === 'function') {
         plotEl.on('plotly_relayout', handleRelayout);
       }
+      await Plotly.Plots.resize(plotEl);
       clampingRef.current = true;
-      return applyAxisRanges(plotEl, xRange, yRange);
+      await applyAxisRanges(plotEl, xRange, yRange);
     }).finally(() => {
       clampingRef.current = false;
       setIsZoomed(false);
     });
 
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+          if (clampingRef.current || !plotEl.layout) return;
+          clearTimeout(resizeTimerRef.current);
+          resizeTimerRef.current = setTimeout(async () => {
+            clampingRef.current = true;
+            try {
+              await Plotly.Plots.resize(plotEl);
+              await applyAxisRanges(plotEl, boundsRef.current.x, boundsRef.current.y);
+            } finally {
+              clampingRef.current = false;
+            }
+          }, 120);
+        })
+      : null;
+
+    resizeObserver?.observe(plotEl);
+
     return () => {
       clearTimeout(validateTimerRef.current);
+      clearTimeout(resizeTimerRef.current);
+      resizeObserver?.disconnect();
       validateRef.current = null;
       const handler = relayoutHandlerRef.current;
       relayoutHandlerRef.current = null;
@@ -335,11 +368,18 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
           Reset
         </button>
       </div>
-      <div
-        ref={containerRef}
-        id={plotId}
-        style={{ width: '100%', height: '360px', position: 'relative' }}
-      />
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+        <div
+          ref={containerRef}
+          id={plotId}
+          style={{
+            width: `min(100%, ${maxPlotWidth}px)`,
+            aspectRatio: `${xSpan} / ${ySpan}`,
+            maxHeight: MAX_PLOT_HEIGHT,
+            position: 'relative',
+          }}
+        />
+      </div>
       {isZoomed && (
         <div
           style={{
