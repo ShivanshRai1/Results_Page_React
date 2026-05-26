@@ -69,26 +69,47 @@ function isZoomedIn(xRange, yRange, bounds) {
 export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale, plotId, grid }) => {
   const containerRef = useRef(null);
   const clampingRef = useRef(false);
+  const boundsRef = useRef(getGridBounds(grid));
+  const plotSnapshotRef = useRef(null);
   const [isZoomed, setIsZoomed] = useState(false);
   const { isDark } = useTheme();
   const { min, max } = minMax2D(field);
 
-  const handleReset = () => {
-    if (!containerRef.current) return;
-    const bounds = getGridBounds(grid);
-    Plotly.relayout(containerRef.current, {
-      'xaxis.range': bounds.x,
-      'yaxis.range': bounds.y,
-      'xaxis.autorange': false,
-      'yaxis.autorange': false,
+  const resetPlotView = () => {
+    const plotEl = containerRef.current;
+    const snapshot = plotSnapshotRef.current;
+    if (!plotEl || !snapshot) return;
+
+    const bounds = boundsRef.current;
+    clampingRef.current = true;
+
+    const resetLayout = {
+      ...snapshot.layout,
+      xaxis: {
+        ...snapshot.layout.xaxis,
+        range: [bounds.x[0], bounds.x[1]],
+        autorange: false,
+      },
+      yaxis: {
+        ...snapshot.layout.yaxis,
+        range: [bounds.y[0], bounds.y[1]],
+        autorange: false,
+        scaleanchor: 'x',
+        scaleratio: 1,
+      },
+    };
+
+    Plotly.react(plotEl, snapshot.data, resetLayout, snapshot.config).finally(() => {
+      clampingRef.current = false;
+      setIsZoomed(false);
     });
-    setIsZoomed(false);
   };
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const bounds = getGridBounds(grid);
+    boundsRef.current = bounds;
     const xRange = bounds.x;
     const yRange = bounds.y;
 
@@ -200,13 +221,17 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
     const plotEl = containerRef.current;
 
-    Plotly.newPlot(plotEl, data, layout, {
+    const plotConfig = {
       displayModeBar: true,
       modeBarButtonsToRemove: ['toImage', 'sendDataToCloud', 'lasso2d', 'select2d'],
       responsive: true,
       doubleClick: 'reset',
       scrollZoom: false,
-    }).then(() => {
+    };
+
+    plotSnapshotRef.current = { data, layout, config: plotConfig };
+
+    Plotly.newPlot(plotEl, data, layout, plotConfig).then(() => {
       clampingRef.current = true;
       return Plotly.relayout(plotEl, {
         'xaxis.range': xRange,
@@ -234,8 +259,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
       if (clampingRef.current) return;
 
       if (eventData['xaxis.autorange'] === true || eventData['yaxis.autorange'] === true) {
-        applyClampedRanges(bounds.x, bounds.y);
-        setIsZoomed(false);
+        resetPlotView();
         return;
       }
 
@@ -253,12 +277,21 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
 
       const clampedX = clampAxisRange(nextX, bounds.x);
       const clampedY = clampAxisRange(nextY, bounds.y);
+      const fullXSpan = bounds.x[1] - bounds.x[0];
+      const fullYSpan = bounds.y[1] - bounds.y[0];
+      const xSpan = nextX[1] - nextX[0];
+      const ySpan = nextY[1] - nextY[0];
+      const zoomedOut = xSpan >= fullXSpan || ySpan >= fullYSpan;
 
-      if (!rangesNearlyEqual(clampedX, nextX) || !rangesNearlyEqual(clampedY, nextY)) {
+      if (zoomedOut) {
+        applyClampedRanges(bounds.x, bounds.y);
+        setIsZoomed(false);
+      } else if (!rangesNearlyEqual(clampedX, nextX) || !rangesNearlyEqual(clampedY, nextY)) {
         applyClampedRanges(clampedX, clampedY);
+        setIsZoomed(isZoomedIn(clampedX, clampedY, bounds));
+      } else {
+        setIsZoomed(isZoomedIn(clampedX, clampedY, bounds));
       }
-
-      setIsZoomed(isZoomedIn(clampedX, clampedY, bounds));
     };
 
     plotEl.on('plotly_relayout', handleRelayout);
@@ -279,7 +312,7 @@ export const PCBHeatmaps = ({ title, field, footprints, showOutlines, autoScale,
           </div>
         </div>
         <button
-          onClick={handleReset}
+          onClick={resetPlotView}
           style={{
             padding: '6px 12px',
             fontSize: '14px',
